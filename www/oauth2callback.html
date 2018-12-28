@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Oauth callback</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+    <script>
+        var json_str_escaped = window.location.hash.slice(1);
+        // unescape
+        //console.log(json_str_escaped);
+        var params = JSON.parse('{"' + decodeURI(json_str_escaped).replace(/"/g, '\\"').replace(/&/g, '","').replace(/=/g,'":"') + '"}')
+        console.log(params);
+
+        fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' + params.access_token)
+            .then(response => {
+                return response.json();
+            })
+            .then(data => {
+                //console.log(data);
+            })
+            .catch(error => {
+                //console.log(error);
+            });
+
+        fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id&mine=true&maxResults=1', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + params.access_token
+            }
+        }).then(response => {
+            return response.json();
+        }).then(data => {
+            console.log(data);
+        }).catch(error => {
+            console.log(error);
+        });
+
+    </script>
+</body>
+</html>

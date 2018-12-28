@@ -4,74 +4,25 @@
 		<title>ARJUN VERSION</title>
 	</head>
 	<body>
-		<iframe id="player" type="text/html" width="640" height="390"
- 		src="https://www.youtube.com/channel/UCFHR8G8yk3xbyBGuEFNKbnw/live?enablejsapi=1&origin=http://localhost:8080"
- 		frameborder="0"></iframe>
 		<script src="https://apis.google.com/js/api.js"></script>
 		<script type="text/javascript">
-			// 2. This code loads the IFrame Player API code asynchronously.
-			/*var tag = document.createElement('script');
-
-			tag.src = "https://www.youtube.com/iframe_api";
-			var firstScriptTag = document.getElementsByTagName('script')[0];
-			firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-
-			// 3. This function creates an <iframe> (and YouTube player)
-			//    after the API code downloads.
-			var player;
-			function onYouTubeIframeAPIReady() {
-				player = new YT.Player('player', {
-					height: '390',
-					width: '640',
-					playerVars: {
-						listType: 'user_uploads',
-						list: 'UCFHR8G8yk3xbyBGuEFNKbnw'
-					},
-					events: {
-						'onReady': onPlayerReady,
-						'onStateChange': onPlayerStateChange
-					}
-				});
-			}
-
-			// 4. The API will call this function when the video player is ready.
-			function onPlayerReady(event) {
-				event.target.playVideo();
-			}
-
-			// 5. The API calls this function when the player's state changes.
-			//    The function indicates that when playing a video (state=1),
-			//    the player should play for six seconds and then stop.
-			var done = false;
-			function onPlayerStateChange(event) {
-				if (event.data == YT.PlayerState.PLAYING && !done) {
-				setTimeout(stopVideo, 6000);
-				done = true;
-				}
-			}
-			function stopVideo() {
-				player.stopVideo();
-			}
-			*/
-			/*
 			gapi.load('client', () => {
 				gapi.client.init({
 					'apiKey': 'AIzaSyDTBNiFjnG-F6dABJcugjBZZlM0homi8Ag',
 				    'clientId': '946689392269-rd0qkinhi24uv8q7kf7pc981sd0vm9mf.apps.googleusercontent.com',
 				    'scope': 'profile'
 				}).then(() => {
-					var options = {
-						'part': 'id',
-						'mine': 'true'
-					};
-					return gapi.client.youtube.liveStreams.list(options);
+					console.log(gapi.client);
+					return gapi.client.people.people.get({
+						'resourceName': 'people/me',
+						'requestMask.includeField': 'person.names'
+					});
 				}).then(response => {
 					console.log(response.result);
 				}, reason => {
 					console.log('Error: ', reason);
 				});
 			});
-			*/
 
 		</script>
 	</body>
