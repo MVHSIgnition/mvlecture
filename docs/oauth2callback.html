@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Livestream Controller</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+    <h1>Livestream Controller</h1>
+    <button onclick="markTimestamp()">Bookmark</button>
+    <button onclick="clearBookmarks()">Clear Bookmarks</button>
+    <p id="error" style="color:red"></p>
+
+    <h3>Bookmarks</h3>
+    <ul id="bookmarks">
+    </ul>
+
+    <script>
+        // Create timestamps array based on cookie
+        var timestampsCookie = getCookie('timestamps'); 
+        var timestamps = timestampsCookie ? timestampsCookie.split(',') : [];
+        updateBookmarksList();
+
+        // Get url hash contents
+        var json_str_escaped = window.location.hash.slice(1);
+        var params = JSON.parse('{"' + decodeURI(json_str_escaped).replace(/"/g, '\\"').replace(/&/g, '","').replace(/=/g,'":"') + '"}');
+        
+        // Validate token, print error if not valid
+        if (!params.error) {
+            fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' + params.access_token)
+                .then(response => {
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        console.log('Error: ', data.error);
+                        document.getElementById('error').innerHTML = 'Error: ' + data.error;
+                    }
+                })
+                .catch(error => {
+                    console.log(error);
+                });
+        } else {
+            console.log('Error: ', params.error);
+        }
+        
+        function markTimestamp() {
+            fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet&mine=true&maxResults=1', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + params.access_token
+                }
+            }).then(response => {
+                return response.json();
+            }).then(data => {
+                console.log(data);
+                
+                if (!data.items[0].snippet.actualEndTime) {
+                    document.getElementById('error').innerHTML = '';
+
+                    // MAYBE use scheduledStartTime if timestamps appear to be not in the correct place
+                    var startDate = new Date(data.items[0].snippet.actualStartTime);
+                    var curDate = new Date();
+                    
+                    var msDif = curDate.getTime() - startDate.getTime();
+                    var timestamp = getTimestamp(msDif);
+                    
+                    console.log(timestamp);
+                    addToBookmarksList(timestamp);
+                    timestamps.push(timestamp);
+                    document.cookie = 'timestamps=' + timestamps;
+                } else {
+                    document.getElementById('error').innerHTML = 'Error: User is not currently livestreaming.';
+                    console.log('Error: User is not currently livestreaming.');
+                }
+            }).catch(error => {
+                console.log(error);
+            });
+        }
+
+        function clearBookmarks() {
+            document.cookie = 'timestamps=';
+            timestamps = [];
+            updateBookmarksList();
+        }
+
+        function updateBookmarksList() {
+            document.getElementById('bookmarks').innerHTML = '';
+            for (var i = 0; i < timestamps.length; i++) {
+                document.getElementById('bookmarks').insertAdjacentHTML('beforeend', '<li>' + timestamps[i] + '</li>');
+            }
+        }
+
+        function addToBookmarksList(timestamp) {
+            document.getElementById('bookmarks').insertAdjacentHTML('beforeend', '<li>' + timestamp + '</li>');
+        }
+
+        function getTimestamp(ms) {
+            if (ms > 0) {
+                var s, m, h;
+                s = Math.floor(ms / 1000);
+                m = Math.floor(s / 60);
+                h = Math.floor(m / 60);
+                s %= 60;
+                m %= 60;
+
+                var fmt = '';
+                if (Math.floor(h / 10) == 0)
+                    fmt += '0';
+                fmt += h + ':';
+                if (Math.floor(m / 10) == 0)
+                    fmt += '0';
+                fmt += m + ':';
+                if (Math.floor(s / 10) == 0)
+                    fmt += '0';
+                fmt += s;
+                
+                return fmt;
+            } else {
+                return '00:00:00';
+            }
+        }
+
+        function getCookie(cname) {
+            var name = cname + "=";
+            var decodedCookie = decodeURIComponent(document.cookie);
+            var ca = decodedCookie.split(';');
+            for(var i = 0; i < ca.length; i++) {
+                var c = ca[i];
+                while (c.charAt(0) == ' ') {
+                    c = c.substring(1);
+                }
+                if (c.indexOf(name) == 0) {
+                    return c.substring(name.length, c.length);
+                }
+            }
+            return "";
+        }
+
+    </script>
+</body>
+</html>
