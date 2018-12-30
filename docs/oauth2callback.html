@@ -28,6 +28,7 @@
         
         // Validate token, print error if not valid
         if (!params.error) {
+            document.getElementById('error').innerHTML = '';
             fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' + params.access_token)
                 .then(response => {
                     return response.json();
@@ -46,7 +47,8 @@
         }
         
         function markTimestamp() {
-            fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet&mine=true&maxResults=1', {
+            document.getElementById('error').innerHTML = '';
+            fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status&mine=true&maxResults=1', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -57,9 +59,7 @@
             }).then(data => {
                 console.log(data);
                 
-                if (!data.items[0].snippet.actualEndTime) {
-                    document.getElementById('error').innerHTML = '';
-
+                if (data.items[0].status.recordingStatus == 'recording') {
                     // MAYBE use scheduledStartTime if timestamps appear to be not in the correct place
                     var startDate = new Date(data.items[0].snippet.actualStartTime);
                     var curDate = new Date();
