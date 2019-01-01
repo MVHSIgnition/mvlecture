@@ -10,7 +10,9 @@
     <h1>Livestream Controller</h1>
     <button onclick="markTimestamp()">Bookmark</button>
     <button onclick="clearBookmarks()">Clear Bookmarks</button>
+    <button onclick="updateYoutubeDescription()">Update Youtube Description</button>
     <p id="error" style="color:red"></p>
+    <p id="success" style="color:green"></p>
 
     <h3>Bookmarks</h3>
     <ul id="bookmarks">
@@ -45,10 +47,12 @@
         } else {
             console.log('Error: ', params.error);
         }
+
+        var broadcastData = {};
         
         function markTimestamp() {
             document.getElementById('error').innerHTML = '';
-            fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet&mine=true&maxResults=1', {
+            fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet&mine=true&maxResults=1', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -58,6 +62,7 @@
                 return response.json();
             }).then(data => {
                 console.log(data);
+                broadcastData = data;
                 
                 if (!data.items[0].snippet.actualEndTime && data.items[0].snippet.actualStartTime) {
                     var startDate = new Date(data.items[0].snippet.actualStartTime);
@@ -73,6 +78,48 @@
                 } else {
                     document.getElementById('error').innerHTML = 'Error: User is not currently livestreaming.';
                     console.log('Error: User is not currently livestreaming.');
+                }
+            }).catch(error => {
+                console.log(error);
+            });
+        }
+
+        function updateYoutubeDescription() {
+            document.getElementById('error').innerHTML = '';
+            document.getElementById('success').innerHTML = '';
+
+            console.log('broadcastData: ', broadcastData);
+            var timestampsString = '';
+            for (var i = 0; i < timestamps.length; i++) {
+                timestampsString += timestamps[i] + '\n';
+            }
+            console.log(timestampsString);
+
+            var data = {
+                id: broadcastData.items[0].id,
+                snippet: {
+                    description: timestampsString,
+                    title: broadcastData.items[0].snippet.title,
+                    scheduledStartTime: broadcastData.items[0].snippet.scheduledStartTime,
+                }
+            };
+
+            fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + params.access_token,
+                },
+                body: JSON.stringify(data),
+            }).then(response => {
+                return response.json();
+            }).then(data => {
+                console.log(data);
+                if (data.error) {
+                    console.log(data.error);
+                    document.getElementById('error').innerHTML = 'An error occured when trying to update Youtube description';
+                } else {
+                    document.getElementById('success').innerHTML = 'Successfully updated Youtube description';
                 }
             }).catch(error => {
                 console.log(error);
