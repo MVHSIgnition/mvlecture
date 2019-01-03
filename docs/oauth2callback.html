@@ -211,7 +211,8 @@
             });
         }
 
-        function startStreaming() {
+        function startEndStream() {
+            // Start stream
             var insertLiveStreamData = {
                 "snippet": {
                     "title": "Teacher LiveStream"
@@ -223,7 +224,7 @@
                 }
             };
 
-            fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn', {
+            fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=id,snippet,cdn', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
