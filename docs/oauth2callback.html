@@ -9,7 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
-	<form class="w3-container w3-card-4" action="/action_page.php">
+	<form class="w3-container w3-card-4">
     <h1 class = "h1">Livestream Controller</h1>
     
 	  <h2 class="w3-text-blue" >Title</h2>
@@ -175,10 +175,14 @@
                     },
                     "status": {
                         "privacyStatus": "public"
+                    },
+                    "contentDetails": {
+                        "recordFromStart": true,
+                        "enableAutoStart": true
                     }
                 };
 
-                fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status', {
+                fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -192,7 +196,7 @@
                     var broadcastId = data.id;
 
                     //var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?apix_params={"id":"' + broadcastId + '","part":"id","streamId":"' + streamId + '"}';
-                    var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id='+broadcastId+'&part=id&streamId='+streamId;
+                    var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id='+broadcastId+'&part=id,snippet,contentDetails&streamId='+streamId;
                     //console.log(bindLiveBroadcastURL);
 
                     fetch(bindLiveBroadcastURL, {
