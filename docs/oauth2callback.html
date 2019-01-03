@@ -9,14 +9,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 <body>
+	<form class="w3-container w3-card-4" action="/action_page.php">
     <h1 class = "h1">Livestream Controller</h1>
-    <form class="w3-container w3-card-4" action="/action_page.php">
+    
 	  <h2 class="w3-text-blue" >Title</h2>
    
 	  <label class="w3-text-blue"><b>Title of Stream</b></label>
 	  <input class="w3-input w3-border" name="first" type="text"></p>
-	  <p>       
-	</form>
+	  <p>       	
+	
     <button class = "button1" onclick="startEndStream()" style="vertical-align:middle"><span>Start Stream</span></button>
     <button class = "button1" onclick="updateYoutubeDescription()" style="vertical-align:middle"><span>Update Youtube Description</span></button>
         <button class = "button" onclick="markTimestamp()" style="vertical-align:middle"><span>Bookmark</span></button>
@@ -26,8 +27,9 @@
 
     <h3>Bookmarks</h3>
     <ul id="bookmarks">
+	    
     </ul>
-
+	</form>
     <script>
 
         // Create timestamps array based on cookie
