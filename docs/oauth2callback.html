@@ -14,67 +14,11 @@
     <p id="error" style="color:red"></p>
     <p id="success" style="color:green"></p>
 
-    <div id="video-container"></div>
-    <div id="image-container"></div>
-
     <h3>Bookmarks</h3>
     <ul id="bookmarks">
     </ul>
 
-    <script src="js/ffmpeg-mp4.js"></script>
-    <script type="text/javascript" src="http://www.dynamsoft.com/library/dcs/dynamsoft.camera.min.js"> </script>
     <script>
-        var dcsObject, imageViewer;
-
-        var width = 480, height = 320;
-
-        function onInitSuccess(videoViewerId, imageViewerId) {
-            dcsObject = dynamsoft.dcsEnv.getObject(videoViewerId); // Get the Dynamsoft Webcam object
-            dcsObject.videoviewer.setWidth(width);
-            dcsObject.videoviewer.setHeight(height);
-            imageViewer = dcsObject.getImageViewer(imageViewerId); // Get a specific image viewer
-            imageViewer.ui.setWidth(width);
-            imageViewer.ui.setHeight(height);
-        }
-
-        function onInitFailure(errorCode, errorString) {
-            alert('Init failed: ' + errorString);
-        };
-        dynamsoft.dcsEnv.init('video-container', 'image-container', onInitSuccess, onInitFailure);
-
-        var cameraList = dcsObject.camera.getCameraList();
-        console.log(cameraList);
-        
-        var stdout = '';
-        var stderr = '';
-
-        if (navigator.mediaDevices.getUserMedia) {       
-            navigator.mediaDevices.getUserMedia({video: true})
-              .then(function(stream) {
-                console.log(stream);
-                var video = document.querySelector("#videoElement");
-                video.srcObject = stream;
-                var url = URL.createObjectURL(stream);
-                console.log('thing: ', url);
-                var result = ffmpeg({
-                    MEMFS: [{name: 'test.webm', data: video.src}],
-                    arguments: ["-i", "test.webm", "-c:v", "libvpx", "-an", "out.webm"],
-                    print: function(data) { stdout += data + "\n"; },
-                    printErr: function(data) { stderr += data + "\n"; },
-                    onExit: function(code) {
-                        console.log("Process exited with code " + code);
-                        console.log(stderr);
-                        console.log(stdout);
-                    },
-                });
-                var out = result.MEMFS[0];
-                console.log('out: ', out);
-              })
-              .catch(function(err0r) {
-                console.log(err0r);
-                console.log("Something went wrong!");
-              });
-        }
 
         // Create timestamps array based on cookie
         var timestampsCookie = getCookie('timestamps'); 
