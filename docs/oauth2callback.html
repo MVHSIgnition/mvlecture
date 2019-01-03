@@ -17,7 +17,7 @@
 	  <label class="w3-text-blue"><b>Title of Stream</b></label>
 	  <input class="w3-input w3-border" id="title" type="text">    	
 	
-    <button class = "button1" onclick="startEndStream()" style="vertical-align:middle"><span>Start Stream</span></button>
+    <button class = "button1" id="startBtn" onclick="startEndStream()" style="vertical-align:middle"><span>Start Stream</span></button>
     <button class = "button1" onclick="updateYoutubeDescription()" style="vertical-align:middle"><span>Update Youtube Description</span></button>
         <button class = "button" onclick="markTimestamp()" style="vertical-align:middle"><span>Bookmark</span></button>
     <button class = "button" onclick="clearBookmarks()" style="vertical-align:middle"><span>Clear Bookmarks</span></button>
@@ -144,6 +144,8 @@
                 document.getElementById('error').innerHTML = 'Please enter a stream name';
             } else {
                 document.getElementById('error').innerHTML = '';
+            
+                document.getElementById('startBtn').className = 'changedButton';
                 // Start stream
                 var insertLiveStreamData = {
                     "snippet": {
@@ -173,53 +175,82 @@
                     var timeISOString = new Date().toISOString();
                     var insertLiveBroadcastData = {
                         "snippet": {
-                            "scheduledStartTime": timeISOString,
-                            "title": document.getElementById('title').value
+                            "title": "Teacher LiveStream"
                         },
-                        "status": {
-                            "privacyStatus": "public"
-                        },
-                        "contentDetails": {
-                            "recordFromStart": true,
-                            "enableAutoStart": true
+                        "cdn": {
+                            "resolution": "720p",
+                            "frameRate": "30fps",
+                            "ingestionType": "rtmp"
                         }
                     };
 
-                    fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails', {
+                    fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'Authorization': 'Bearer ' + params.access_token,
                         },
-                        body: JSON.stringify(insertLiveBroadcastData),
+                        body: JSON.stringify(insertLiveStreamData),
                     }).then(response => {
                         return response.json();
                     }).then(data => {
-                        console.log('INSERT liveBroadcast: ', data);
-                        var broadcastId = data.id;
+                        console.log('INSERT liveStream: ', data);
+                        var streamId = data.id;
+                        var rtmpAddr = data.cdn.ingestionInfo.ingestionAddress + '/' + data.cdn.ingestionInfo.streamName;
+                        
+                        var timeISOString = new Date().toISOString();
+                        var insertLiveBroadcastData = {
+                            "snippet": {
+                                "scheduledStartTime": timeISOString,
+                                "title": document.getElementById('title').value
+                            },
+                            "status": {
+                                "privacyStatus": "public"
+                            },
+                            "contentDetails": {
+                                "recordFromStart": true,
+                                "enableAutoStart": true
+                            }
+                        };
 
-                        //var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?apix_params={"id":"' + broadcastId + '","part":"id","streamId":"' + streamId + '"}';
-                        var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id='+broadcastId+'&part=id&streamId='+streamId;
-                        //console.log(bindLiveBroadcastURL);
-
-                        fetch(bindLiveBroadcastURL, {
+                        fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'Authorization': 'Bearer ' + params.access_token,
-                            }
+                            },
+                            body: JSON.stringify(insertLiveBroadcastData),
                         }).then(response => {
                             return response.json();
                         }).then(data => {
-                            console.log('BIND liveBroadcast: ', data);
-                            fetch('../start_streaming', {
+                            console.log('INSERT liveBroadcast: ', data);
+                            var broadcastId = data.id;
+
+                            //var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?apix_params={"id":"' + broadcastId + '","part":"id","streamId":"' + streamId + '"}';
+                            var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id='+broadcastId+'&part=id&streamId='+streamId;
+                            //console.log(bindLiveBroadcastURL);
+
+                            fetch(bindLiveBroadcastURL, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    rtmpAddr: rtmpAddr
-                                })
+                                    'Authorization': 'Bearer ' + params.access_token,
+                                }
+                            }).then(response => {
+                                return response.json();
+                            }).then(data => {
+                                console.log('BIND liveBroadcast: ', data);
+                                fetch('../start_streaming', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                        rtmpAddr: rtmpAddr
+                                    })
+                                });
+                            }).catch(error => {
+                                console.log(error);
                             });
                         }).catch(error => {
                             console.log(error);
@@ -227,8 +258,6 @@
                     }).catch(error => {
                         console.log(error);
                     });
-                }).catch(error => {
-                    console.log(error);
                 });
             }
         }
