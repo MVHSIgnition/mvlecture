@@ -224,24 +224,72 @@
                 }
             };
 
-            fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=id,snippet,cdn', {
-                method: 'PUT',
+            fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn', {
+                method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': 'Bearer ' + params.access_token,
                 },
                 body: JSON.stringify(insertLiveStreamData),
             }).then(response => {
-                return response.json()
+                return response.json();
             }).then(data => {
-                console.log(data);
+                console.log('INSERT liveStream: ', data);
+                var streamId = data.id;
+                var rtmpAddr = data.cdn.ingestionInfo.ingestionAddress + '/' + data.cdn.ingestionInfo.streamName;
+                
+                var timeISOString = new Date().toISOString();
+                var insertLiveBroadcastData = {
+                    "snippet": {
+                        "scheduledStartTime": timeISOString,
+                        "title": "Placeholder Title"
+                    },
+                    "status": {
+                        "privacyStatus": "public"
+                    }
+                };
+
+                fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + params.access_token,
+                    },
+                    body: JSON.stringify(insertLiveBroadcastData),
+                }).then(response => {
+                    return response.json();
+                }).then(data => {
+                    console.log('INSERT liveBroadcast: ', data);
+                    var broadcastId = data.id;
+
+                    //var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?apix_params={"id":"' + broadcastId + '","part":"id","streamId":"' + streamId + '"}';
+                    var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id='+broadcastId+'&part=id&streamId='+streamId;
+                    //console.log(bindLiveBroadcastURL);
+
+                    fetch(bindLiveBroadcastURL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + params.access_token,
+                        }
+                    }).then(response => {
+                        return response.json();
+                    }).then(data => {
+                        console.log('BIND liveBroadcast: ', data);
+                        fetch('../start_streaming', {
+                            method: 'POST',
+                            body: {
+                                rtmpAddr: rtmpAddr,
+                            }
+                        });
+                    }).catch(error => {
+                        console.log(error);
+                    });
+                }).catch(error => {
+                    console.log(error);
+                });
             }).catch(error => {
                 console.log(error);
-            });
-            
-            fetch('../start_streaming', {
-                method: 'POST',
-                body: ''
             });
         }
 

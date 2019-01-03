@@ -23,7 +23,8 @@ app.get('/oauth2callback', (req, res) => {
 */
 
 app.post('/start_streaming', (req, res) => {
-    
+    console.log(req.body);
+    res.end();
 });
 
 http.listen(process.env.PORT || 1266, function() {
