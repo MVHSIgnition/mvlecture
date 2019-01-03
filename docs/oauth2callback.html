@@ -1,6 +1,88 @@
 <!DOCTYPE html>
 <html>
 <head>
+	<style>
+	.button {
+	  display: inline-block;
+	  border-radius: 4px;
+	  background-color: #f4511e;
+	  border: none;
+	  color: #FFFFFF;
+	  text-align: center;
+	  font-size: 28px;
+	  /*padding: 20px;*/
+	  width: 48.4%;
+	  height: 400px;
+	  transition: all 0.5s;
+	  cursor: pointer;
+	  margin: 5px;
+	}
+
+	.button span {
+	  cursor: pointer;
+	  display: inline-block;
+	  position: relative;
+	  transition: 0.5s;
+	}
+
+	.button span:after {
+	  content: '\00bb';
+	  position: absolute;
+	  opacity: 0;
+	  top: 0;
+	  right: -20px;
+	  transition: 0.5s;
+	}
+
+	.button:hover span {
+	  padding-right: 25px;
+	}
+
+	.button:hover span:after {
+	  opacity: 1;
+	  right: 0;
+	}
+	.button1 {
+	  display: inline-block;
+	  border-radius: 4px;
+	  background-color: #f4511e;
+	  border: none;
+	  color: #FFFFFF;
+	  text-align: center;
+	  font-size: 28px;
+	  padding: 20px;
+	  width: 97.7%;
+	  height: 400px;
+	  transition: all 0.5s;
+	  cursor: pointer;
+	  margin: 5px;
+	}
+
+	.button1 span {
+	  cursor: pointer;
+	  display: inline-block;
+	  position: relative;
+	  transition: 0.5s;
+	}
+
+	.button1 span:after {
+	  content: '\00bb';
+	  position: absolute;
+	  opacity: 0;
+	  top: 0;
+	  right: -20px;
+	  transition: 0.5s;
+	}
+
+	.button1:hover span {
+	  padding-right: 25px;
+	}
+
+	.button1:hover span:after {
+	  opacity: 1;
+	  right: 0;
+	}
+	</style>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Livestream Controller</title>
@@ -8,9 +90,10 @@
 </head>
 <body>
     <h1>Livestream Controller</h1>
-    <button onclick="markTimestamp()">Bookmark</button>
-    <button onclick="clearBookmarks()">Clear Bookmarks</button>
-    <button onclick="updateYoutubeDescription()">Update Youtube Description</button>
+    <button class = "button1" onclick="startEndStream()" style="vertical-align:middle"><span>Start Stream</span></button>
+    <button class = "button" onclick="markTimestamp()" style="vertical-align:middle"><span>Bookmark</span></button>
+    <button class = "button" onclick="clearBookmarks()" style="vertical-align:middle"><span>Clear Bookmarks</span></button>
+    <button class = "button1" onclick="updateYoutubeDescription()" style="vertical-align:middle"><span>Update Youtube Description</span></button>
     <p id="error" style="color:red"></p>
     <p id="success" style="color:green"></p>
 
