@@ -128,6 +128,39 @@
             });
         }
 
+        function startStreaming() {
+            var insertLiveStreamData = {
+                "snippet": {
+                    "title": "Teacher LiveStream"
+                },
+                "cdn": {
+                    "resolution": "720p",
+                    "frameRate": "30fps",
+                    "ingestionType": "rtmp"
+                }
+            };
+
+            fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + params.access_token,
+                },
+                body: JSON.stringify(insertLiveStreamData),
+            }).then(response => {
+                return response.json()
+            }).then(data => {
+                console.log(data);
+            }).catch(error => {
+                console.log(error);
+            });
+            
+            fetch('../start_streaming', {
+                method: 'POST',
+                body: ''
+            });
+        }
+
         function clearBookmarks() {
             document.cookie = 'timestamps=';
             timestamps = [];

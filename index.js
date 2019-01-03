@@ -1,7 +1,7 @@
 const express = require('express');
 const app = express();
 const http = require('http').Server(app);
-const url = require('url');
+const { exec } = require('child_process');
 
 app.use(express.static(__dirname + '/docs/'));
 
@@ -21,6 +21,10 @@ app.get('/oauth2callback', (req, res) => {
     console.log(url.parse(req.originalUrl));
 });
 */
+
+app.post('/start_streaming', (req, res) => {
+    
+});
 
 http.listen(process.env.PORT || 1266, function() {
     var port = http.address().port;
