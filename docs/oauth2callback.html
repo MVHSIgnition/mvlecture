@@ -205,9 +205,12 @@
                         console.log('BIND liveBroadcast: ', data);
                         fetch('../start_streaming', {
                             method: 'POST',
-                            body: {
-                                rtmpAddr: rtmpAddr,
-                            }
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                rtmpAddr: rtmpAddr
+                            })
                         });
                     }).catch(error => {
                         console.log(error);

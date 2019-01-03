@@ -3,6 +3,10 @@ const app = express();
 const http = require('http').Server(app);
 const { exec } = require('child_process');
 
+const bodyParser = require('body-parser')
+app.use( bodyParser.json() );       // to support JSON-encoded bodies
+app.use(express.json());       // to support JSON-encoded bodies
+
 app.use(express.static(__dirname + '/docs/'));
 
 /*app.get('/', (req, res) => {
@@ -24,6 +28,27 @@ app.get('/oauth2callback', (req, res) => {
 
 app.post('/start_streaming', (req, res) => {
     console.log(req.body);
+    exec('ffmpeg -list_devices true -f dshow -i dummy', 
+        (err, stdout, stderr) => {
+            if (err) {
+                console.log(err);
+                return;
+            }
+
+            String.raw(stdout);
+            //console.log(`stdout: ${stdout}`);
+            //console.log(`stderr: ${stderr}`);
+        });
+    /*exec('ffmpeg -f dshow -i video="Logitech HD Webcam C270":audio="Microphone (HD Webcam C270)" -profile:v high -pix_fmt yuvj420p -level:v 4.1 -preset ultrafast -tune zerolatency -vcodec libx264 -r 10 -b:v 512k -s 640x360 -acodec aac -ac 2 -ab 32k -ar 44100 -f flv "rtmp://a.rtmp.youtube.com/live2/pxeg-0uqs-eu2t-3g28"', 
+        (err, stdout, stderr) => {
+            if (err) {
+                console.log(err);
+                return;
+            }
+
+            console.log(`stdout: ${stdout}`);
+            console.log(`stderr: ${stderr}`);
+        });*/
     res.end();
 });
 
