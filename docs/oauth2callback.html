@@ -38,7 +38,7 @@
         updateBookmarksList();
 
         var isStreaming = false;
-        var broadcastId = '';
+        var startDate;
 
         // Get url hash contents
         var json_str_escaped = window.location.hash.slice(1);
@@ -69,36 +69,16 @@
         function markTimestamp() {
             if (isStreaming) {
                 document.getElementById('error').innerHTML = '';
-                fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet&mine=true&maxResults=1', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + params.access_token
-                    }
-                }).then(response => {
-                    return response.json();
-                }).then(data => {
-                    console.log(data);
-                    broadcastData = data;
-                    
-                    if (!data.items[0].snippet.actualEndTime && data.items[0].snippet.actualStartTime) {
-                        var startDate = new Date(data.items[0].snippet.actualStartTime);
-                        var curDate = new Date();
-                        
-                        var msDif = curDate.getTime() - startDate.getTime();
-                        var timestamp = getTimestamp(msDif);
-                        
-                        console.log(timestamp);
-                        addToBookmarksList(timestamp);
-                        timestamps.push(timestamp);
-                        document.cookie = 'timestamps=' + timestamps;
-                    } else {
-                        document.getElementById('error').innerHTML = 'Error: User is not currently livestreaming.';
-                        console.log('Error: User is not currently livestreaming.');
-                    }
-                }).catch(error => {
-                    console.log(error);
-                });
+
+                var curDate = new Date();
+                
+                var msDif = curDate.getTime() - startDate.getTime();
+                var timestamp = getTimestamp(msDif);
+                
+                console.log(timestamp);
+                addToBookmarksList(timestamp);
+                timestamps.push(timestamp);
+                document.cookie = 'timestamps=' + timestamps;
             }
         }
 
@@ -115,11 +95,11 @@
             console.log(timestampsString);
 
             var data = {
-                id: broadcastData.items[0].id,
+                id: broadcastData.id,
                 snippet: {
                     description: timestampsString,
-                    title: broadcastData.items[0].snippet.title,
-                    scheduledStartTime: broadcastData.items[0].snippet.scheduledStartTime,
+                    title: broadcastData.snippet.title,
+                    scheduledStartTime: broadcastData.snippet.scheduledStartTime,
                 }
             };
 
@@ -133,7 +113,6 @@
             }).then(response => {
                 return response.json();
             }).then(data => {
-                console.log(data);
                 if (data.error) {
                     console.log(data.error);
                     document.getElementById('error').innerHTML = 'An error occured when trying to update Youtube description';
@@ -231,10 +210,10 @@
                                 return response.json();
                             }).then(data => {
                                 console.log('INSERT liveBroadcast: ', data);
-                                broadcastId = data.id;
+                                broadcastData = data;
 
                                 //var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?apix_params={"id":"' + broadcastId + '","part":"id","streamId":"' + streamId + '"}';
-                                var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id='+broadcastId+'&part=id&streamId='+streamId;
+                                var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id='+broadcastData.id+'&part=id&streamId='+streamId;
                                 //console.log(bindLiveBroadcastURL);
 
                                 fetch(bindLiveBroadcastURL, {
@@ -258,8 +237,10 @@
                                     }).then(() => {
                                         document.getElementById('startBtn').className = 'changedButton';
                                         document.getElementById('startBtn').innerHTML = 'Stop Streaming';
-                                        isStreaming = true;
                                         document.getElementById('bookmarksDiv').style = 'display:block';
+                                        isStreaming = true;
+
+                                        startDate = new Date();
                                     });
                                 }).catch(error => {
                                     console.log(error);
@@ -278,7 +259,7 @@
                     fetch('../stop_streaming', {
                         method: 'POST'
                     }).then(() => {
-                        var transitionLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id='+broadcastId+'&broadcastStatus=complete&part=id';
+                        var transitionLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id='+broadcastData.id+'&broadcastStatus=complete&part=id';
                         fetch(transitionLiveBroadcastURL, {
                             method: 'POST',
                             headers: {
