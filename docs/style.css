@@ -36,10 +36,21 @@ button {
     transition: all .2s ease;
 }
 
-button:hover {
+button:hover:enabled {
 	background: #fccb0b;
     border-color: #fccb0b;
     box-shadow: 0 2px 2px 0 rgba(0,0,0,.14), 0 3px 1px -2px rgba(0,0,0,.12), 0 1px 5px 0 rgba(0,0,0,.2);
+}
+
+.changedButton {
+    border-color: #ff0000;
+    color: #ff0000;
+}
+
+.changedButton:hover:enabled {
+    background: #ff0000;
+    border-color: #ff0000;
+    color: #fff;
 }
 
 .area {

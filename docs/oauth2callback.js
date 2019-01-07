@@ -102,13 +102,18 @@ function updateYoutubeDescription() {
 }
 
 function startEndStream() {
+    //document.getElementById('startBtn').classList.add('transitioning');
+    document.getElementById('startBtn').disabled = true;
+
     if (!isStreaming) {
         if (!document.getElementById('title').value) {
             document.getElementById('error').innerHTML = 'Please enter a stream name';
             document.getElementById('error').style.display = 'inline-block';
+            document.getElementById('startBtn').disabled = false;
             return;
         }
 
+        broadcastData = {};
         document.getElementById('startBtn').innerHTML = 'Starting Stream...';
         document.getElementById('error').innerHTML = '';
         document.getElementById('error').style.display = 'none';
@@ -134,6 +139,11 @@ function startEndStream() {
             body: insertLiveStreamData
         }).then(res => res.json()).then(data => {
             console.log('INSERT liveStream: ', data);
+
+            if (data.error) {
+                throw 'INSERT liveStream failed.';
+            }
+
             broadcastData.streamId = data.id;
             broadcastData.rtmpAddr = data.cdn.ingestionInfo.ingestionAddress + '/' + data.cdn.ingestionInfo.streamName;
 
@@ -158,10 +168,15 @@ function startEndStream() {
                     'Content-Type': 'application/json',
                     'Authorization': 'Bearer ' + params.access_token,
                 },
-                body: JSON.stringify(insertLiveBroadcastData),
+                body: insertLiveBroadcastData,
             });
         }).then(res => res.json()).then(data => {
             console.log('INSERT liveBroadcast: ', data);
+
+            if (data.error) {
+                throw 'INSERT liveBroadcast failed.';
+            }
+
             broadcastData = {...data, ...broadcastData}; // this merges the two objects
 
             //var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?apix_params={"id":"' + broadcastId + '","part":"id","streamId":"' + broadcastData.streamId + '"}';
@@ -177,6 +192,10 @@ function startEndStream() {
             });
         }).then(res => res.json()).then(data => {
             console.log('BIND liveBroadcast: ', data);
+
+            if (data.error) {
+                throw 'BIND liveBroadcast failed.';
+            }
             
             return fetch('../start_streaming', {
                 method: 'POST',
@@ -191,10 +210,12 @@ function startEndStream() {
             document.getElementById('startBtn').className = 'changedButton';
             document.getElementById('startBtn').innerHTML = 'Stop Streaming';
             document.getElementById('bookmarksDiv').style.display = 'block';
+            document.getElementById('startBtn').disabled = false;
             isStreaming = true;
             startDate = new Date();
         }).catch(error => {
             console.log(error);
+            thereIsAnError('An error occured when starting the stream...please try refreshing the page.');
         });
     } else {
         setTimeout(() => {
@@ -215,12 +236,15 @@ function startEndStream() {
                 document.getElementById('startBtn').className = 'button1';
                 document.getElementById('startBtn').innerHTML = 'Start Streaming';
                 document.getElementById('bookmarksDiv').style.display = 'none';
+                document.getElementById('startBtn').disabled = false;
                 isStreaming = false;
                 updateYoutubeDescription();
                 clearBookmarks();
             });
         }, 3000);
 
+        document.getElementById('error').innerHTML = '';
+        document.getElementById('error').style.display = 'none';
         document.getElementById('startBtn').innerHTML = 'Stopping Stream...';
     }
 }
