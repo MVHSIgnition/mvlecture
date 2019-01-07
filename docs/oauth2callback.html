@@ -170,80 +170,48 @@
                             }
                         };
 
-                        fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn', {
+                        fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'Authorization': 'Bearer ' + params.access_token,
                             },
-                            body: JSON.stringify(insertLiveStreamData),
+                            body: JSON.stringify(insertLiveBroadcastData),
                         }).then(response => {
                             return response.json();
                         }).then(data => {
-                            console.log('INSERT liveStream: ', data);
-                            var streamId = data.id;
-                            var rtmpAddr = data.cdn.ingestionInfo.ingestionAddress + '/' + data.cdn.ingestionInfo.streamName;
-                            
-                            var timeISOString = new Date().toISOString();
-                            var insertLiveBroadcastData = {
-                                "snippet": {
-                                    "scheduledStartTime": timeISOString,
-                                    "title": document.getElementById('title').value
-                                },
-                                "status": {
-                                    "privacyStatus": "public"
-                                },
-                                "contentDetails": {
-                                    "recordFromStart": true,
-                                    "enableAutoStart": true
-                                }
-                            };
+                            console.log('INSERT liveBroadcast: ', data);
+                            broadcastData = data;
 
-                            fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails', {
+                            //var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?apix_params={"id":"' + broadcastId + '","part":"id","streamId":"' + streamId + '"}';
+                            var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id='+broadcastData.id+'&part=id&streamId='+streamId;
+                            //console.log(bindLiveBroadcastURL);
+
+                            fetch(bindLiveBroadcastURL, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
                                     'Authorization': 'Bearer ' + params.access_token,
-                                },
-                                body: JSON.stringify(insertLiveBroadcastData),
+                                }
                             }).then(response => {
                                 return response.json();
                             }).then(data => {
-                                console.log('INSERT liveBroadcast: ', data);
-                                broadcastData = data;
-
-                                //var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?apix_params={"id":"' + broadcastId + '","part":"id","streamId":"' + streamId + '"}';
-                                var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id='+broadcastData.id+'&part=id&streamId='+streamId;
-                                //console.log(bindLiveBroadcastURL);
-
-                                fetch(bindLiveBroadcastURL, {
+                                console.log('BIND liveBroadcast: ', data);
+                                fetch('../start_streaming', {
                                     method: 'POST',
                                     headers: {
                                         'Content-Type': 'application/json',
-                                        'Authorization': 'Bearer ' + params.access_token,
-                                    }
-                                }).then(response => {
-                                    return response.json();
-                                }).then(data => {
-                                    console.log('BIND liveBroadcast: ', data);
-                                    fetch('../start_streaming', {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify({
-                                            rtmpAddr: rtmpAddr
-                                        })
-                                    }).then(() => {
-                                        document.getElementById('startBtn').className = 'changedButton';
-                                        document.getElementById('startBtn').innerHTML = 'Stop Streaming';
-                                        document.getElementById('bookmarksDiv').style = 'display:block';
-                                        isStreaming = true;
+                                    },
+                                    body: JSON.stringify({
+                                        rtmpAddr: rtmpAddr
+                                    })
+                                }).then(() => {
+                                    document.getElementById('startBtn').className = 'changedButton';
+                                    document.getElementById('startBtn').innerHTML = 'Stop Streaming';
+                                    document.getElementById('bookmarksDiv').style = 'display:block';
+                                    isStreaming = true;
 
-                                        startDate = new Date();
-                                    });
-                                }).catch(error => {
-                                    console.log(error);
+                                    startDate = new Date();
                                 });
                             }).catch(error => {
                                 console.log(error);
@@ -251,6 +219,8 @@
                         }).catch(error => {
                             console.log(error);
                         });
+                    }).catch(error => {
+                        console.log(error);
                     });
                 }
             } else {
