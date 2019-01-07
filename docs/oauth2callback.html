@@ -158,15 +158,19 @@
                         console.log('INSERT liveStream: ', data);
                         var streamId = data.id;
                         var rtmpAddr = data.cdn.ingestionInfo.ingestionAddress + '/' + data.cdn.ingestionInfo.streamName;
-                        
+                            
+                        var timeISOString = new Date().toISOString();
                         var insertLiveBroadcastData = {
                             "snippet": {
-                                "title": "Teacher LiveStream"
+                                "scheduledStartTime": timeISOString,
+                                "title": document.getElementById('title').value
                             },
-                            "cdn": {
-                                "resolution": "720p",
-                                "frameRate": "30fps",
-                                "ingestionType": "rtmp"
+                            "status": {
+                                "privacyStatus": "public"
+                            },
+                            "contentDetails": {
+                                "recordFromStart": true,
+                                "enableAutoStart": true
                             }
                         };
 
