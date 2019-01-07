@@ -1,11 +1,8 @@
 const express = require('express');
 const app = express();
-const http = require('http').Server(app);
 const { exec } = require('child_process');
 
-const bodyParser = require('body-parser')
-app.use( bodyParser.json() );       // to support JSON-encoded bodies
-app.use(express.json());       // to support JSON-encoded bodies
+app.use(express.json()); // to support JSON-encoded bodies
 
 app.use(express.static(__dirname + '/docs/'));
 
@@ -28,34 +25,33 @@ app.get('/oauth2callback', (req, res) => {
 
 app.post('/start_streaming', (req, res) => {
     console.log(req.body);
-    exec('ffmpeg -list_devices true -f dshow -i dummy', 
-        (err, stdout, stderr) => {
-            if (err) {
-                console.log(err);
+    exec('ffmpeg -list_devices true -f dshow -i dummy', (err, stdout, stderr) => {
+        if (err) {
+            console.log(err);
 
-                var firstQuote = stderr.indexOf('"');
-                var secondQuote = stderr.indexOf('"', firstQuote+1);
-                var inputVidName = stderr.substring(firstQuote+1, secondQuote);
-                console.log('input vid: ', inputVidName);
+            var firstQuote = stderr.indexOf('"');
+            var secondQuote = stderr.indexOf('"', firstQuote+1);
+            var inputVidName = stderr.substring(firstQuote+1, secondQuote);
+            console.log('input vid: ', inputVidName);
 
-                var audio = stderr.indexOf('DirectShow audio devices');
-                var thirdQuote = stderr.indexOf('"', audio);
-                var fourthQuote = stderr.indexOf('"', thirdQuote+1);
-                var micName = stderr.substring(thirdQuote+1, fourthQuote);
-                console.log('mic: ', micName);
+            var audio = stderr.indexOf('DirectShow audio devices');
+            var thirdQuote = stderr.indexOf('"', audio);
+            var fourthQuote = stderr.indexOf('"', thirdQuote+1);
+            var micName = stderr.substring(thirdQuote+1, fourthQuote);
+            console.log('mic: ', micName);
 
-                exec('ffmpeg -f dshow -i video="'+ inputVidName +'":audio="'+ micName +'" -profile:v high -pix_fmt yuvj420p -level:v 4.1 -preset ultrafast -tune zerolatency -vcodec libx264 -r 10 -b:v 512k -s 640x360 -acodec aac -ac 2 -ab 32k -ar 44100 -f flv "'+ req.body.rtmpAddr +'"', 
-                    (err, stdout, stderr) => {
-                        console.log('*****************************************************************\nREACHED THIS POINT\n******************************************************');
-                        
-                        if (err) {
-                            console.log(err);
-                        }
-                        console.log(`stdout: ${stdout}`);
-                        console.log(`stderr: ${stderr}`);
-                    });
-            }
-        });
+            exec('ffmpeg -f dshow -i video="'+ inputVidName +'":audio="'+ micName +'" -profile:v high -pix_fmt yuvj420p -level:v 4.1 -preset ultrafast -tune zerolatency -vcodec libx264 -r 10 -b:v 512k -s 640x360 -acodec aac -ac 2 -ab 32k -ar 44100 -f flv "'+ req.body.rtmpAddr +'"', 
+                (err, stdout, stderr) => {
+                    console.log('*****************************************************************\nREACHED THIS POINT\n******************************************************');
+                    
+                    if (err) {
+                        console.log(err);
+                    }
+                    console.log(`stdout: ${stdout}`);
+                    console.log(`stderr: ${stderr}`);
+                });
+        }
+    });
     
     res.end();
 });
@@ -72,7 +68,7 @@ app.post('/stop_streaming', (req, res) => {
     res.end();
 });
 
-http.listen(process.env.PORT || 1266, function() {
-    var port = http.address().port;
-    console.log('Server listening on port ', port)
+let listener = app.listen(process.env.PORT || 1266, () => {
+    let port = listener.address().port;
+    console.log('Server listening on port', port);
 });

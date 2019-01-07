@@ -1,348 +1,45 @@
 <!DOCTYPE html>
 <html>
-<head>
-	<link rel="stylesheet" href="style.css">
-	
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>Livestream Controller</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body>
-	<div class="w3-container w3-card-4">
-        <h1 class = "h1">Livestream Controller</h1>
-        
-        <p id="error" style="color:red"></p>
-        <p id="success" style="color:green"></p>
-        
-        <h2 class="w3-text-blue" >Title</h2>
-    
-        <label class="w3-text-blue"><b>Title of Stream</b></label>
-        <input class="w3-input w3-border" id="title" type="text" />    	
-        
-        <button class="button1" id="startBtn" onclick="startEndStream()" style="vertical-align:middle"><span>Start Streaming</span></button>
-        
-        <div id="bookmarksDiv" style="display:none">
-            <button class="button" onclick="markTimestamp()" style="vertical-align:middle"><span>Bookmark</span></button>
-            <h3>Bookmarks</h3>
-            <ul id="bookmarks">
-            </ul>
-        </div>
-    </div>
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<title>Livestream Controller</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link href="https://fonts.googleapis.com/css?family=Lato" rel="stylesheet">
 
-    <script>
+		<link rel="stylesheet" href="style.css">
+	</head>
+	<body>
 
-        // Create timestamps array based on cookie
-        var timestampsCookie = getCookie('timestamps'); 
-        var timestamps = timestampsCookie ? timestampsCookie.split(',') : [];
-        updateBookmarksList();
+		<div style="box-shadow: 0 0.2rem 0.4rem rgba(0,0,0,.23); width: 100%; background: #fff;">
+			<h1 style="padding: 14px;">Livestream Controller</h1>
+		</div>
 
-        var isStreaming = false;
-        var startDate;
+		<div style="padding: 30px;">
+			<div id="error" style="border-left: red 6px solid; border-radius: 10px; background: #eeeeee; font-size: 18px; color: #000; border-bottom-left-radius: 0; border-top-left-radius: 0; padding: 6px 10px; display: none;"></div>
 
-        // Get url hash contents
-        var json_str_escaped = window.location.hash.slice(1);
-        var params = JSON.parse('{"' + decodeURI(json_str_escaped).replace(/"/g, '\\"').replace(/&/g, '","').replace(/=/g,'":"') + '"}');
-        
-        // Validate token, print error if not valid
-        if (!params.error) {
-            document.getElementById('error').innerHTML = '';
-            fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' + params.access_token)
-                .then(response => {
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.error) {
-                        console.log('Error: ', data.error);
-                        document.getElementById('error').innerHTML = 'Error: ' + data.error;
-                    }
-                })
-                .catch(error => {
-                    console.log(error);
-                });
-        } else {
-            console.log('Error: ', params.error);
-        }
+			<div id="success" style="border-left: red 6px solid; border-radius: 10px; background: #00ff00; font-size: 18px; color: #000; border-bottom-left-radius: 0; border-top-left-radius: 0; margin: 16px; padding: 6px 10px; display: none;"></div>
 
-        var broadcastData = {};
-        
-        function markTimestamp() {
-            if (isStreaming) {
-                document.getElementById('error').innerHTML = '';
+			<div class="area">
+				<h2>What is the title of this steam?</h2>
+				<br>
+				<input type="text" id="title" placeholder="Type here...">
+				<br><br>
+				<button id="startBtn" onclick="startEndStream()">Start Streaming</button>
+			</div>
 
-                var curDate = new Date();
-                
-                var msDif = curDate.getTime() - startDate.getTime();
-                var timestamp = getTimestamp(msDif);
-                
-                console.log(timestamp);
-                addToBookmarksList(timestamp);
-                timestamps.push(timestamp);
-                document.cookie = 'timestamps=' + timestamps;
-            }
-        }
+			<div id="bookmarksDiv" class="area" style="display: none;">
+				<h2>Bookmarks</h2>
+				<br><br>
+				<ul id="bookmarks"></ul>
+				<br>
+				<button class="button" style="width: 200px;" onclick="markTimestamp()">Add Bookmark Now</button>
+			</div>
 
-        function updateYoutubeDescription() {
-            document.getElementById('error').innerHTML = '';
-            document.getElementById('success').innerHTML = '';
+			<br><br><br>
+			Written by the MVHS Ignition Club
+		</div>
 
-            console.log('broadcastData: ', broadcastData);
-            var timestampsString = '';
-            for (var i = 0; i < timestamps.length; i++) {
-                timestampsString += timestamps[i] + '\n';
-            }
-            timestampsString += '\nMade possible by the MVHS Ignition Club';
-            console.log(timestampsString);
-
-            var data = {
-                id: broadcastData.id,
-                snippet: {
-                    description: timestampsString,
-                    title: broadcastData.snippet.title,
-                    scheduledStartTime: broadcastData.snippet.scheduledStartTime,
-                }
-            };
-
-            fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet', {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + params.access_token,
-                },
-                body: JSON.stringify(data),
-            }).then(response => {
-                return response.json();
-            }).then(data => {
-                if (data.error) {
-                    console.log(data.error);
-                    document.getElementById('error').innerHTML = 'An error occured when trying to update Youtube description';
-                } else {
-                    document.getElementById('success').innerHTML = 'Successfully updated Youtube description';
-                }
-            }).catch(error => {
-                console.log(error);
-            });
-        }
-
-        function startEndStream() {
-            if (!isStreaming) {
-                if (document.getElementById('title').value === '') {
-                    document.getElementById('error').innerHTML = 'Please enter a stream name';
-                } else {
-                    document.getElementById('startBtn').innerHTML = 'Starting Stream...';
-
-                    document.getElementById('error').innerHTML = '';
-                
-                    // Start stream
-                    var insertLiveStreamData = {
-                        "snippet": {
-                            "title": "Teacher LiveStream"
-                        },
-                        "cdn": {
-                            "resolution": "720p",
-                            "frameRate": "30fps",
-                            "ingestionType": "rtmp"
-                        }
-                    };
-
-                    fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': 'Bearer ' + params.access_token,
-                        },
-                        body: JSON.stringify(insertLiveStreamData),
-                    }).then(response => {
-                        return response.json();
-                    }).then(data => {
-                        console.log('INSERT liveStream: ', data);
-                        var streamId = data.id;
-                        var rtmpAddr = data.cdn.ingestionInfo.ingestionAddress + '/' + data.cdn.ingestionInfo.streamName;
-                        
-                        var insertLiveBroadcastData = {
-                            "snippet": {
-                                "title": "Teacher LiveStream"
-                            },
-                            "cdn": {
-                                "resolution": "720p",
-                                "frameRate": "30fps",
-                                "ingestionType": "rtmp"
-                            }
-                        };
-
-                        fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': 'Bearer ' + params.access_token,
-                            },
-                            body: JSON.stringify(insertLiveStreamData),
-                        }).then(response => {
-                            return response.json();
-                        }).then(data => {
-                            console.log('INSERT liveStream: ', data);
-                            var streamId = data.id;
-                            var rtmpAddr = data.cdn.ingestionInfo.ingestionAddress + '/' + data.cdn.ingestionInfo.streamName;
-                            
-                            var timeISOString = new Date().toISOString();
-                            var insertLiveBroadcastData = {
-                                "snippet": {
-                                    "scheduledStartTime": timeISOString,
-                                    "title": document.getElementById('title').value
-                                },
-                                "status": {
-                                    "privacyStatus": "public"
-                                },
-                                "contentDetails": {
-                                    "recordFromStart": true,
-                                    "enableAutoStart": true
-                                }
-                            };
-
-                            fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': 'Bearer ' + params.access_token,
-                                },
-                                body: JSON.stringify(insertLiveBroadcastData),
-                            }).then(response => {
-                                return response.json();
-                            }).then(data => {
-                                console.log('INSERT liveBroadcast: ', data);
-                                broadcastData = data;
-
-                                //var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?apix_params={"id":"' + broadcastId + '","part":"id","streamId":"' + streamId + '"}';
-                                var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id='+broadcastData.id+'&part=id&streamId='+streamId;
-                                //console.log(bindLiveBroadcastURL);
-
-                                fetch(bindLiveBroadcastURL, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'Authorization': 'Bearer ' + params.access_token,
-                                    }
-                                }).then(response => {
-                                    return response.json();
-                                }).then(data => {
-                                    console.log('BIND liveBroadcast: ', data);
-                                    fetch('../start_streaming', {
-                                        method: 'POST',
-                                        headers: {
-                                            'Content-Type': 'application/json',
-                                        },
-                                        body: JSON.stringify({
-                                            rtmpAddr: rtmpAddr
-                                        })
-                                    }).then(() => {
-                                        document.getElementById('startBtn').className = 'changedButton';
-                                        document.getElementById('startBtn').innerHTML = 'Stop Streaming';
-                                        document.getElementById('bookmarksDiv').style = 'display:block';
-                                        isStreaming = true;
-
-                                        startDate = new Date();
-                                    });
-                                }).catch(error => {
-                                    console.log(error);
-                                });
-                            }).catch(error => {
-                                console.log(error);
-                            });
-                        }).catch(error => {
-                            console.log(error);
-                        });
-                    });
-                }
-            } else {
-                setTimeout(function () {
-                    // Stop the stream
-                    fetch('../stop_streaming', {
-                        method: 'POST'
-                    }).then(() => {
-                        var transitionLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id='+broadcastData.id+'&broadcastStatus=complete&part=id';
-                        fetch(transitionLiveBroadcastURL, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': 'Bearer ' + params.access_token,
-                            }
-                        }).then(response => {
-                            return response.json();
-                        }).then(data => {
-                            console.log('TRANSITION liveBroadcast: ', data);
-                            document.getElementById('startBtn').className = 'button1';
-                            document.getElementById('startBtn').innerHTML = 'Start Streaming';
-                            document.getElementById('bookmarksDiv').style = 'display:none';
-                            isStreaming = false;
-                            updateYoutubeDescription();
-                            clearBookmarks();
-                        })
-                    })
-                }, 3000);
-
-                document.getElementById('startBtn').innerHTML = 'Stopping Stream...';
-            }
-        }
-
-        function clearBookmarks() {
-            document.cookie = 'timestamps=';
-            timestamps = [];
-            updateBookmarksList();
-        }
-
-        function updateBookmarksList() {
-            document.getElementById('bookmarks').innerHTML = '';
-            for (var i = 0; i < timestamps.length; i++) {
-                document.getElementById('bookmarks').insertAdjacentHTML('beforeend', '<li>' + timestamps[i] + '</li>');
-            }
-        }
-
-        function addToBookmarksList(timestamp) {
-            document.getElementById('bookmarks').insertAdjacentHTML('beforeend', '<li>' + timestamp + '</li>');
-        }
-
-        function getTimestamp(ms) {
-            if (ms > 0) {
-                var s, m, h;
-                s = Math.floor(ms / 1000);
-                m = Math.floor(s / 60);
-                h = Math.floor(m / 60);
-                s %= 60;
-                m %= 60;
-
-                var fmt = '';
-                if (Math.floor(h / 10) == 0)
-                    fmt += '0';
-                fmt += h + ':';
-                if (Math.floor(m / 10) == 0)
-                    fmt += '0';
-                fmt += m + ':';
-                if (Math.floor(s / 10) == 0)
-                    fmt += '0';
-                fmt += s;
-                
-                return fmt;
-            } else {
-                return '00:00:00';
-            }
-        }
-
-        function getCookie(cname) {
-            var name = cname + "=";
-            var decodedCookie = decodeURIComponent(document.cookie);
-            var ca = decodedCookie.split(';');
-            for(var i = 0; i < ca.length; i++) {
-                var c = ca[i];
-                while (c.charAt(0) == ' ') {
-                    c = c.substring(1);
-                }
-                if (c.indexOf(name) == 0) {
-                    return c.substring(name.length, c.length);
-                }
-            }
-            return "";
-        }
-
-    </script>
-</body>
+		<script type="text/javascript" src="oauth2callback.js"></script>
+	</body>
 </html>
