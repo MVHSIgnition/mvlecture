@@ -28,7 +28,7 @@ class BookmarksManager {
         for (let i = 0; i < this.bookmarks.length; i++) {
             let bookmark = this.bookmarks[i];
             html += `
-                <div data-id="${i}" class="each-bookmark">
+                <div class="each-bookmark">
                     ${bookmark.name} — ${bookmark.time}
                     <button class="edit-btn" onclick="bookmarksManager.edit(${i})">Edit</button>
                     <button class="remove-btn" onclick="bookmarksManager.remove(${i})">X</button>
