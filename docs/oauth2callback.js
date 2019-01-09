@@ -1,8 +1,85 @@
 // Create timestamps array based on localStorage
 // https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage
 
-var timestamps = localStorage.getItem('timestamps') ? JSON.parse(localStorage.getItem('timestamps')) : [];
-updateBookmarksList();
+class BookmarksManager {
+    constructor() {
+        this.bookmarks = localStorage.getItem('bookmarks') ? JSON.parse(localStorage.getItem('bookmarks')) : [];
+        this.render();
+    }
+
+    render() {
+        document.getElementById('bookmarks').innerHTML = this.toHTMLString();
+    }
+
+    toString() {
+        let text = '';
+
+        for (let i = 0; i < this.bookmarks.length; i++) {
+            let bookmark = this.bookmarks[i];
+            text += `${bookmark.name} — ${bookmark.time}\n`;
+        }
+
+        return text;
+    }
+
+    toHTMLString() {
+        let html = '';
+
+        for (let i = 0; i < this.bookmarks.length; i++) {
+            let bookmark = this.bookmarks[i];
+            html += `
+                <div data-id="${i}" class="each-bookmark">
+                    ${bookmark.name} — ${bookmark.time}
+                    <button class="edit-btn" onclick="bookmarksManager.edit(${i})">Edit</button>
+                    <button class="remove-btn" onclick="bookmarksManager.remove(${i})">X</button>
+                </div>
+                <br>
+            `;
+        }
+
+        return html;
+    }
+
+    add(time, name) {
+        this.bookmarks.push({
+            time,
+            name: name || 'Untitled bookmark'
+        });
+        
+        this.save();
+        this.render();
+    }
+
+    save() {
+        localStorage.setItem('bookmarks', JSON.stringify(this.bookmarks));
+    }
+
+    edit(i = 0) {
+
+        let newName = prompt('What should the name of this bookmark be?', this.bookmarks[i].name);
+
+        if (newName) {
+            this.bookmarks[i].name = newName;
+        }
+
+        this.save();
+        this.render();
+    }
+
+    remove(i = 0) {
+        this.bookmarks.splice(i, 1);
+        this.save();
+        this.render();
+    }
+
+    clearAll() {
+        this.bookmarks = [];
+        this.save();
+        this.render();
+    }
+}
+
+let bookmarksManager = new BookmarksManager();
 
 var isStreaming = false;
 var startDate;
@@ -20,6 +97,7 @@ function thereIsAnError(error) {
     document.getElementById('error').innerHTML = 'Error: ' + error;
     document.getElementById('error').style.display = 'inline-block';
 }
+
 
 // Validate token, print error if not valid
 if (!params.error) {
@@ -49,12 +127,10 @@ function markTimestamp() {
         document.getElementById('error').style.display = 'none';
         
         var msDif = Date.now() - startDate.getTime();
-        var timestamp = getTimestamp(msDif);
-        
-        console.log(timestamp);
-        addToBookmarksList(timestamp);
-        timestamps.push(timestamp);
-        localStorage.setItem('timestamps', JSON.stringify(timestamps));
+        let name = document.getElementById('nameOfBookmark').value;
+        document.getElementById('nameOfBookmark').value = '';
+
+        bookmarksManager.add(getTimestamp(msDif), name);
     }
 }
 
@@ -65,11 +141,7 @@ function updateYoutubeDescription() {
 
     console.log('broadcastData: ', broadcastData);
 
-    var timestampsString = 'Bookmarks:\n';
-    for (var i = 0; i < timestamps.length; i++) {
-        timestampsString += timestamps[i] + '\n';
-    }
-    timestampsString += '\nMade possible by the MVHS Ignition Club';
+    let timestampsString = 'Bookmarks:\n' + bookmarksManager.toString() + '\nMade possible by the MVHS Ignition Club';
     console.log(timestampsString);
 
     var data = {
@@ -239,7 +311,7 @@ function startEndStream() {
                 document.getElementById('startBtn').disabled = false;
                 isStreaming = false;
                 updateYoutubeDescription();
-                clearBookmarks();
+                bookmarksManager.clearAll();
             });
         }, 3000);
 
@@ -247,24 +319,6 @@ function startEndStream() {
         document.getElementById('error').style.display = 'none';
         document.getElementById('startBtn').innerHTML = 'Stopping Stream...';
     }
-}
-
-function clearBookmarks() {
-    localStorage.removeItem('timestamps');
-    timestamps = [];
-    updateBookmarksList();
-}
-
-function updateBookmarksList() {
-    let html = ''
-    for (var i = 0; i < timestamps.length; i++) {
-        html += '<li>' + timestamps[i] + '</li>';
-    }
-    document.getElementById('bookmarks').innerHTML = html;
-}
-
-function addToBookmarksList(timestamp) {
-    document.getElementById('bookmarks').innerHTML += '<li>' + timestamp + '</li>';
 }
 
 function getTimestamp(ms) {

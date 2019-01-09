@@ -28,11 +28,14 @@
 				<button id="startBtn" onclick="startEndStream()">Start Streaming</button>
 			</div>
 
-			<div id="bookmarksDiv" class="area" style="display: none;">
+			<div id="bookmarksDiv" class="area" >
 				<h2>Bookmarks</h2>
-				<br><br>
-				<ul id="bookmarks"></ul>
 				<br>
+				<ul id="bookmarks"></ul>
+				<br><br>
+				<h3>What is the name of this bookmark?</h3>
+				<input type="text" id="nameOfBookmark" placeholder="Type here...">
+				<br><br>
 				<button class="button" style="width: 200px;" onclick="markTimestamp()">Add Bookmark Now</button>
 			</div>
 
