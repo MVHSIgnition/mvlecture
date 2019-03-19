@@ -196,8 +196,8 @@ function startEndStream() {
                 title: "Teacher LiveStream"
             },
             cdn: {
-                resolution: "720p",
-                frameRate: "30fps",
+                resolution: "variable",
+                frameRate: "variable",
                 ingestionType: "rtmp"
             }
         });
