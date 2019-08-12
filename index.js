@@ -40,7 +40,7 @@ app.post('/start_streaming', (req, res) => {
             var micName = stderr.substring(thirdQuote+1, fourthQuote);
             console.log('mic: ', micName);
 
-            exec('ffmpeg -f dshow -i video="'+ inputVidName +'":audio="'+ micName +'" -profile:v high -pix_fmt yuvj420p -level:v 4.1 -preset ultrafast -tune zerolatency -vcodec libx264 -r 10 -b:v 512k -s 640x360 -acodec aac -ac 2 -ab 32k -ar 44100 -f flv "'+ req.body.rtmpAddr +'"', 
+            exec('ffmpeg -f dshow -i video="'+ inputVidName +'":audio="'+ micName +'" -profile:v high -pix_fmt yuvj420p -level:v 4.1 -preset ultrafast -tune zerolatency -vcodec libx264 -r 10 -b:v 512k -s 1920x1080 -acodec aac -ac 2 -ab 32k -ar 44100 -f flv "'+ req.body.rtmpAddr +'"', 
                 (err, stdout, stderr) => {
                     console.log('*****************************************************************\nREACHED THIS POINT\n******************************************************');
                     
