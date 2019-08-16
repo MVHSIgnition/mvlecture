@@ -6,23 +6,6 @@ app.use(express.json()); // to support JSON-encoded bodies
 
 app.use(express.static(__dirname + '/docs/'));
 
-/*app.get('/', (req, res) => {
-    var url = 'https://accounts.google.com/o/oauth2/auth?' + 
-					'client_id=946689392269-rd0qkinhi24uv8q7kf7pc981sd0vm9mf.apps.googleusercontent.com&' +
-					'redirect_uri=http%3A%2F%2F' + window.location.host + '%2Foauth2callback&' + 
-					'scope=https://www.googleapis.com/auth/youtube&response_type=token';
-    res.redirect(url);
-    //res.sendFile(__dirname + '/www/index.html');
-});
-
-app.get('/oauth2callback', (req, res) => {
-    res.sendFile(__dirname + '/www/index.html');
-    console.log(req);
-    console.log(req.originalUrl);
-    console.log(url.parse(req.originalUrl));
-});
-*/
-
 app.post('/start_streaming', (req, res) => {
     console.log(req.body);
     exec('ffmpeg -list_devices true -f dshow -i dummy', (err, stdout, stderr) => {
@@ -39,8 +22,8 @@ app.post('/start_streaming', (req, res) => {
             var fourthQuote = stderr.indexOf('"', thirdQuote+1);
             var micName = stderr.substring(thirdQuote+1, fourthQuote);
             console.log('mic: ', micName);
-
-            exec('ffmpeg -f dshow -i video="'+ inputVidName +'":audio="'+ micName +'" -profile:v high -pix_fmt yuvj420p -level:v 4.1 -preset ultrafast -tune zerolatency -vcodec libx264 -r 10 -b:v 512k -s 1920x1080 -acodec aac -ac 2 -ab 32k -ar 44100 -f flv "'+ req.body.rtmpAddr +'"', 
+            
+            exec('ffmpeg -y -f dshow -video_size 1920x1080 -framerate 30 -i video="USB_Camera":audio="'+ micName +'" -f dshow -video_size 1280x720 -framerate 30 -i video="Logitech HD Webcam C270" -filter_complex "[0:v]pad=iw+1280:ih[int];[int][1:v]overlay=W-w:0[vid]" -map [vid] -map 0:a -r 10 -copyts -profile:v high -pix_fmt yuvj420p -level:v 4.1 -preset veryslow -crf 37 -tune zerolatency -vcodec libx264 -b:v 512k -acodec aac -ac 2 -ab 32k -ar 44100 -f flv "'+ req.body.rtmpAddr +'"', 
                 (err, stdout, stderr) => {
                     console.log('*****************************************************************\nREACHED THIS POINT\n******************************************************');
                     
@@ -72,3 +55,13 @@ let listener = app.listen(process.env.PORT || 1266, () => {
     let port = listener.address().port;
     console.log('Server listening on port', port);
 });
+
+/*
+Test command:
+
+ffmpeg -y -f dshow -video_size 1920x1080 -framerate 30 -i video="USB_Camera":audio="Microphone (C-Media USB Audio Device   )" -f dshow -video_size 1280x720 -framerate 30 -i video="Logitech HD Webcam C270" -filter_complex "[0:v]pad=iw+1280:ih[int];[int][1:v]overlay=W-w:0[vid]" -map [vid] -map 0:a -r 10 -copyts -profile:v high -pix_fmt yuvj420p -level:v 4.1 -preset veryslow -crf 37 -tune zerolatency -vcodec libx264 -b:v 512k -acodec aac -ac 2 -ab 32k -ar 44100 output.mp4
+ffmpeg -y -f dshow -video_size 1920x1080 -i video="USB_Camera":audio="Microphone (C-Media USB Audio Device   )" -profile:v high -pix_fmt yuvj420p -level:v 4.1 -preset ultrafast -tune zerolatency -vcodec libx264 -r 10 -b:v 2M -acodec aac -ac 2 -ab 32k -ar 44100 output1.mp4
+ffmpeg -y -f dshow -i video="USB_Camera":audio="Microphone (C-Media USB Audio Device   )" -profile:v high -pix_fmt yuvj420p -level:v 4.1 -preset ultrafast -tune zerolatency -vcodec libx264 -r 10 -b:v 2M -acodec aac -ac 2 -ab 32k -ar 44100 output2.mp4
+ffmpeg -y -f dshow -video_size 1280x720 -i video="USB Video Device":audio="Microphone (C-Media USB Audio Device   )" -profile:v high -pix_fmt yuvj420p -level:v 4.1 -preset ultrafast -tune zerolatency -vcodec libx264 -r 10 -b:v 2M -acodec aac -ac 2 -ab 32k -ar 44100 output3.mp4
+
+*/

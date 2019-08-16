@@ -141,7 +141,7 @@ function updateYoutubeDescription() {
 
     console.log('broadcastData: ', broadcastData);
 
-    let timestampsString = 'Bookmarks:\n' + bookmarksManager.toString() + '\nMade possible by the MVHS Ignition Club';
+    let timestampsString = 'Bookmarks:\n' + bookmarksManager.toString() + '\nWritten by the MVHS Ignition Club\n\nMain project leads:\n    Jonathan Liu and Erik Zhang\nProject Manager\n    Erik Zhang\nSoftware backend:\n    Jonathan Liu\nUser interface + bookmarks:\n    Arjun Patrawala\nHardware:\n    Ian Schneider and Rishon Shah';
     console.log(timestampsString);
 
     var data = {
@@ -249,6 +249,11 @@ function startEndStream() {
                 throw 'INSERT liveBroadcast failed.';
             }
 
+            let youtubeLink = 'https://youtu.be/' + data.id;
+            let youtubeLinkElement = document.getElementById('youtubeLink');
+            youtubeLinkElement.href = youtubeLink;
+            youtubeLinkElement.innerHTML = youtubeLink;
+
             broadcastData = {...data, ...broadcastData}; // this merges the two objects
 
             //var bindLiveBroadcastURL = 'https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?apix_params={"id":"' + broadcastId + '","part":"id","streamId":"' + broadcastData.streamId + '"}';
@@ -282,6 +287,7 @@ function startEndStream() {
             document.getElementById('startBtn').className = 'changedButton';
             document.getElementById('startBtn').innerHTML = 'Stop Streaming';
             document.getElementById('bookmarksDiv').style.display = 'block';
+            document.getElementById('youtubeLinkDiv').style.display = 'block';
             document.getElementById('startBtn').disabled = false;
             isStreaming = true;
             startDate = new Date();
@@ -308,6 +314,7 @@ function startEndStream() {
                 document.getElementById('startBtn').className = 'button1';
                 document.getElementById('startBtn').innerHTML = 'Start Streaming';
                 document.getElementById('bookmarksDiv').style.display = 'none';
+                document.getElementById('youtubeLinkDiv').style.display = 'none';
                 document.getElementById('startBtn').disabled = false;
                 isStreaming = false;
                 updateYoutubeDescription();
