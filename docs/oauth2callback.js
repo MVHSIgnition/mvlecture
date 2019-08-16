@@ -141,7 +141,7 @@ function updateYoutubeDescription() {
 
     console.log('broadcastData: ', broadcastData);
 
-    let timestampsString = 'Bookmarks:\n' + bookmarksManager.toString() + '\nWritten by the MVHS Ignition Club\n\nMain project leads:\n    Jonathan Liu and Erik Zhang\nProject Manager\n    Erik Zhang\nSoftware backend:\n    Jonathan Liu\nUser interface + bookmarks:\n    Arjun Patrawala\nHardware:\n    Ian Schneider and Rishon Shah';
+    let timestampsString = 'Bookmarks:\n' + bookmarksManager.toString() + '\nWritten by the MVHS Ignition Club\n\nMain project leads:\n    Jonathan Liu and Erik Zhang\nProject Manager:\n    Erik Zhang\nSoftware backend:\n    Jonathan Liu\nUser interface + bookmarks:\n    Arjun Patrawala\nHardware:\n    Ian Schneider and Rishon Shah';
     console.log(timestampsString);
 
     var data = {
