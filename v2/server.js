@@ -223,7 +223,7 @@ app.post('/api/stop-streaming', (req, res) => {
   });
 });
 
-app.listen(process.env.PORT || 1266, () => {
+let listener = app.listen(process.env.PORT || 1266, () => {
   let port = listener.address().port;
   console.log('Server listening on port', port);
 });
