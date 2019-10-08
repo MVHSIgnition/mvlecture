@@ -2,12 +2,14 @@ const express = require('express');
 const fetch = require('node-fetch');
 const { exec } = require('child_process');
 const { getTimeout } = require('./helpers.js');
+const FileCleaner = require('cron-file-cleaner').FileCleaner;
 
 const app = express();
 
 app.use(express.json());
 app.use(express.static(__dirname + '/static/'))
 
+const localVideoDirName = "videos/";
 let stream = null;
 
 function clearStream() {
@@ -215,14 +217,11 @@ app.post('/api/init-stream', async (req, res) => {
     resolution: '1920x1080',
     framerate: 30,
   }
-  const webcam2 = {
-    name: 'USB_Camera',
-    resolution: '1920x1080',
-    framerate: 30,
-  }
   const micName = 'Microphone (Realtek High Definition Audio)';
 
-  const cmd = `ffmpeg -y -f dshow -video_size ${webcam1.resolution} -framerate ${webcam1.framerate} -i video="${webcam1.name}":audio="${micName}" -i ./ignition.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+  const localVideoFilename = './' + localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mp4';
+
+  const cmd = `ffmpeg -y -f dshow -video_size ${webcam1.resolution} -framerate ${webcam1.framerate} -i video="${webcam1.name}":audio="${micName}" -i ./ignition.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid];[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -c:v libx264 -preset veryfast ${localVideoFilename} -map [vid2] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
 
   exec(cmd, (err, stdout, stderr) => {
     console.log('ffmpeg command run');
@@ -233,6 +232,10 @@ app.post('/api/init-stream', async (req, res) => {
     }
 
     console.log(stdout, stderr);
+
+    res.send({
+      success: true
+    });
   });
 });
 
@@ -272,8 +275,13 @@ app.post('/api/stop-streaming', (req, res) => {
   });
 });
 
-
 let listener = app.listen(process.env.PORT || 1266, () => {
   let port = listener.address().port;
   console.log('Server listening on port', port);
+});
+
+// Delete all files older than a 24 hours
+let fileWatcher = new FileCleaner(__dirname + '/' + localVideoDirName, 24*3600000, '* */15 * * * *', {
+  start: true,
+  blacklist: '/\.init/'
 });
