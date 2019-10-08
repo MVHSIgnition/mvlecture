@@ -118,21 +118,6 @@ function getTimestamp(ms) {
     }
 }
 
-function createBookmark() {
-    if (isStreaming) {
-        document.getElementById('error').innerHTML = '';
-        document.getElementById('error').style.display = 'none';
-
-        fetch('../api/get-state').then(res => res.json()).then(res => {
-            var msDif = Date.now() - stream.startTime;
-            let name = document.getElementById('nameOfBookmark').value;
-            document.getElementById('nameOfBookmark').value = '';
-
-            bookmarksManager.add(getTimestamp(msDif), name);
-        });       
-    }
-}
-
 function thereIsAnError(error) {
     if (error) {
         console.log('Error:', error);
@@ -141,6 +126,21 @@ function thereIsAnError(error) {
     } else {
         document.getElementById('error').innerHTML = '';
         document.getElementById('error').style.display = 'none';
+    }
+}
+
+function createBookmark() {
+    if (isStreaming) {
+        thereIsAnError(null);
+
+        fetch('../api/get-state').then(res => res.json()).then(data => {
+            let stream = data.stream;
+            var msDif = Date.now() - stream.startTime;
+            let name = document.getElementById('nameOfBookmark').value;
+            document.getElementById('nameOfBookmark').value = '';
+
+            bookmarksManager.add(getTimestamp(msDif), name);
+        });       
     }
 }
 
