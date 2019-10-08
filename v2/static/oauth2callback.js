@@ -5,7 +5,11 @@ if (!window.location.hash) { // if people go to this page without first signing 
 // Get url hash contents
 var json_str_escaped = window.location.hash.slice(1);
 var params = JSON.parse('{"' + decodeURI(json_str_escaped).replace(/"/g, '\\"').replace(/&/g, '","').replace(/=/g,'":"') + '"}');
+var isStreaming;
 
+/*************
+ * FUNCTIONS *
+ *************/
 function thereIsAnError(error) {
     if (error) {
         console.log('Error:', error);
@@ -38,31 +42,118 @@ function checkValidToken() {
         thereIsAnError(params.error);
     }
 }
-checkValidToken();
 
-function startEndStream() {
-    document.getElementById('startBtn').disabled = true;
-
-    let title = document.getElementById('title').value;
-    if (!title) {
-        thereIsAnError('Please enter a stream name');
+function setStreaming(isStreaming) {
+    if (isStreaming) {
+        document.getElementById('startBtn').className = 'changedButton';
+        document.getElementById('startBtn').innerHTML = 'Stop Streaming';
+        document.getElementById('bookmarksDiv').style.display = 'block';
+        document.getElementById('youtubeLinkDiv').style.display = 'block';
         document.getElementById('startBtn').disabled = false;
-        return;
+    } else {
+        document.getElementById('startBtn').className = 'button1';
+        document.getElementById('startBtn').innerHTML = 'Start Streaming';
+        document.getElementById('bookmarksDiv').style.display = 'none';
+        document.getElementById('youtubeLinkDiv').style.display = 'none';
+        document.getElementById('startBtn').disabled = false;
     }
+}
 
-    broadcastData = {};
-    document.getElementById('startBtn').innerHTML = 'Starting Stream...';
-    thereIsAnError(null);
+function updateYoutubeDescription() {
+    let title = document.getElementById('title').value;
+    let credits = 'Written by the MVHS Ignition Club\n\nMain project leads:\n    Jonathan Liu and Erik Zhang\nProject Manager:\n    Erik Zhang\nSoftware backend:\n    Jonathan Liu\nUser interface + bookmarks:\n    Arjun Patrawala\nHardware:\n    Ian Schneider';
+    let description = `Bookmarks: \n${credits}`;
 
-    fetch('../api/init-stream', {
+    return fetch('../api/update-stream', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            oauthToken: params.access_token,
-            title: title
+            title: title,
+            description: description
         })
-    })
+    }).then(res => res.json()).then(data => {
+        if (!data.success) {
+            thereIsAnError(data.error);
+        }
+    });
 }
 
+function startEndStream() {
+    document.getElementById('startBtn').disabled = true;
+
+    if (!isStreaming) {
+        let title = document.getElementById('title').value;
+        if (!title) {
+            thereIsAnError('Please enter a stream name');
+            document.getElementById('startBtn').disabled = false;
+            return;
+        }
+
+        broadcastData = {};
+        document.getElementById('startBtn').innerHTML = 'Starting Stream...';
+        thereIsAnError(null);
+
+        fetch('../api/init-stream', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                oauthToken: params.access_token,
+                title: title
+            })
+        }).then(res => res.json()).then(data => {
+            if (!data.success) {
+                thereIsAnError(data.error);
+                setStreaming(false);
+            }
+            setState();
+        });
+    } else {
+        document.getElementById('error').innerHTML = '';
+        document.getElementById('error').style.display = 'none';
+        document.getElementById('startBtn').innerHTML = 'Stopping Stream...';
+
+        setTimeout(() => {
+            // Stop the stream
+            updateYoutubeDescription().then(() => {
+                fetch('../api/stop-streaming', {
+                    method: 'POST'
+                }).then(res => res.json()).then(data => {
+                    if (!data.success) {
+                        thereIsAnError(data.error);
+                    } else {
+                        setStreaming(false);
+                    }
+
+                    setState();
+                });
+            });
+        }, 3000);
+    }
+}
+
+function setState() {
+    fetch('../api/state', {
+        method: 'GET'
+    }).then(res => res.json()).then(data => {
+        let stream = data.stream;
+        
+        isStreaming = stream.isStreaming;
+        setStreaming(stream.isStreaming);
+        document.getElementById('title').value = stream.title;
+        
+        let youtubeLink = 'https://youtu.be/' + stream.youtubeId;
+        let youtubeLinkElement = document.getElementById('youtubeLink');
+        youtubeLinkElement.href = youtubeLink;
+        youtubeLinkElement.innerHTML = youtubeLink;
+    });
+}
+
+/************************
+ * Initialization stuff *
+ ************************/
+checkValidToken();
+setState();

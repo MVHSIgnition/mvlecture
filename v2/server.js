@@ -11,6 +11,7 @@ app.use(express.static(__dirname + '/static/'))
 
 const localVideoDirName = __dirname + '/videos/';
 let stream = null;
+clearStream();
 
 function clearStream() {
   stream = {
@@ -76,7 +77,7 @@ app.post('/api/delete-bookmark', (req, res) => {
 app.get('/api/state', (req, res) => {
   res.send({
     success: true,
-    data: stream
+    stream: stream
   });
 });
 
@@ -212,12 +213,18 @@ app.post('/api/init-stream', async (req, res) => {
 
   // spin-up ffmpeg to begin feeding video and audio the rtmp url
 
-  const webcam1 = {
+  /*const webcam1 = {
     name: 'Logitech Webcam C930e',
     resolution: '1920x1080',
     framerate: 30,
-  }
-  const micName = 'Microphone (Realtek High Definition Audio)';
+  };
+  const micName = 'Microphone (Realtek High Definition Audio)';*/
+  const webcam1 = {
+    name: 'HD WebCam',
+    resolution: '1280x720',
+    framerate: 30,
+  };
+  const micName = 'Microphone Array (Realtek High Definition Audio(SST))';
 
   const localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mp4';
 
@@ -228,18 +235,19 @@ app.post('/api/init-stream', async (req, res) => {
 
     if (err) {
       console.error(err);
-      return res.send({ success: false, error: err });
     }
 
     console.log(stdout, stderr);
+  });
 
-    res.send({
-      success: true
-    });
+  stream.isStreaming = true;
+  res.send({
+    success: true
   });
 });
 
-app.post('/api/stop-streaming', (req, res) => {
+app.post('/api/stop-streaming', async (req, res) => {
+  console.log('RECEIVED STOP COMMAND');
   if (!stream.isStreaming) {
     return res.send({
       success: false,
@@ -247,7 +255,8 @@ app.post('/api/stop-streaming', (req, res) => {
     })
   }
 
-  exec('taskkill /im ffmpeg.exe /t /f', async (err, stdout, stderr) => {
+  console.log('RUNNING TASKKILL');
+  exec('taskkill /im ffmpeg.exe /t /f', (err, stdout, stderr) => {
     if (err) {
       console.error(err);
       return res.send({ success: false, error: err });
@@ -255,23 +264,26 @@ app.post('/api/stop-streaming', (req, res) => {
 
     console.log('stopped ffmpeg');
     console.log(stdout, stderr)
+  });
+  console.log('RAN TASKKILL');
 
-    // tell google that stream has stopped
-    let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id=${stream.youtubeId}&broadcastStatus=complete&part=id`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + stream.oauthToken
-      }
-    });
-    data = await data.json();
+  // tell google that stream has stopped
+  let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id=${stream.youtubeId}&broadcastStatus=complete&part=id`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + stream.oauthToken
+    }
+  });
+  data = await data.json();
 
-    console.log(data);
+  console.log('GOT DATA FROM GOOGLE');
 
-    clearStream();
-    res.send({
-      success: true
-    });
+  console.log(data);
+
+  clearStream();
+  res.send({
+    success: true
   });
 });
 
