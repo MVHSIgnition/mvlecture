@@ -241,7 +241,6 @@ app.post('/api/init-stream', async (req, res) => {
 
 app.post('/api/stop-streaming', async (req, res) => {
 
-  console.log('RECEIVED STOP COMMAND');
   if (!stream.isStreaming) {
     return res.send({
       success: false,
@@ -258,7 +257,6 @@ app.post('/api/stop-streaming', async (req, res) => {
     })
   }
 
-  console.log('RUNNING TASKKILL');
   exec('taskkill /im ffmpeg.exe /t /f', (err, stdout, stderr) => {
     if (err) {
       console.error(err);
@@ -268,7 +266,6 @@ app.post('/api/stop-streaming', async (req, res) => {
     console.log('stopped ffmpeg');
     console.log(stdout, stderr)
   });
-  console.log('RAN TASKKILL');
 
   // tell google that stream has stopped
   let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id=${stream.youtubeId}&broadcastStatus=complete&part=id`, {
@@ -281,8 +278,6 @@ app.post('/api/stop-streaming', async (req, res) => {
   data = await data.json();
 
   await updateTitleAndDescription(stream.title, oauthToken);
-
-  console.log('GOT DATA FROM GOOGLE');
 
   console.log(data);
 

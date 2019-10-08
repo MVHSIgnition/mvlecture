@@ -1,8 +1,8 @@
 function generateDescription(bookmarks) {
     let text = 'Bookmarks:\n';
 
-    for (let i = 0; i < this.bookmarks.length; i++) {
-        let bookmark = this.bookmarks[i];
+    for (let i = 0; i < bookmarks.length; i++) {
+        let bookmark = bookmarks[i];
         text += `${bookmark.name} — ${bookmark.time}\n`;
     }
 

@@ -133,7 +133,7 @@ function createBookmark() {
     if (isStreaming) {
         thereIsAnError(null);
 
-        fetch('../api/get-state').then(res => res.json()).then(data => {
+        fetch('../api/state').then(res => res.json()).then(data => {
             let stream = data.stream;
             var msDif = Date.now() - stream.startTime;
             let name = document.getElementById('nameOfBookmark').value;
