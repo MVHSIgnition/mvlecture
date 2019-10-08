@@ -173,12 +173,22 @@ function setStreaming(isStreaming) {
         document.getElementById('bookmarksDiv').style.display = 'block';
         document.getElementById('youtubeLinkDiv').style.display = 'block';
         document.getElementById('startBtn').disabled = false;
+        document.querySelector('label').style.display = 'none';
+        adfjaskdic.style.display = 'none';
+        title.disabled = 'true';
+        playlistSelect.style.display = 'none';
+        addDate.style.display = 'none';
     } else {
         document.getElementById('startBtn').className = 'button1';
         document.getElementById('startBtn').innerHTML = 'Start Streaming';
         document.getElementById('bookmarksDiv').style.display = 'none';
         document.getElementById('youtubeLinkDiv').style.display = 'none';
         document.getElementById('startBtn').disabled = false;
+        document.querySelector('label').style.display = '';
+        adfjaskdic.style.display = '';
+        title.disabled = '';
+        playlistSelect.style.display = '';
+        addDate.style.display = '';
     }
 }
 
@@ -194,6 +204,12 @@ function startEndStream() {
             return;
         }
 
+        if (addDate.checked) {
+            title = title.trim() + ' (' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ')';
+        }
+
+        document.getElementById('title').value = title;
+
         broadcastData = {};
         document.getElementById('startBtn').innerHTML = 'Starting Stream...';
         thereIsAnError(null);
@@ -205,7 +221,8 @@ function startEndStream() {
             },
             body: JSON.stringify({
                 oauthToken: params.access_token,
-                title: title
+                title,
+                playlistId: playlistSelect.value
             })
         }).then(res => res.json()).then(data => {
             if (!data.success) {
@@ -250,7 +267,10 @@ function setState() {
         setStreaming(stream.isStreaming);
         document.getElementById('title').value = stream.title;
 
-        bookmarksManager.setBookmarks(stream.bookmarks);
+        if (isStreaming) {
+            bookmarksManager.setBookmarks(stream.bookmarks);
+        }
+
         
         let youtubeLink = 'https://youtu.be/' + stream.youtubeId;
         let youtubeLinkElement = document.getElementById('youtubeLink');
@@ -259,8 +279,27 @@ function setState() {
     });
 }
 
+function loadPlaylists() {
+    fetch('https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true', {
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + params.access_token,
+        }
+    }).then(res => res.json()).then(res => {
+        let { items } = res;
+
+        for (let i = 0; i < items.length; i++) {
+            let opt = document.createElement('option');
+            opt.value = items[i].id;
+            opt.innerText = items[0].snippet.title;
+            playlistSelect.appendChild(opt);
+        }
+    });
+}
+
 /************************
  * Initialization stuff *
  ************************/
 checkValidToken();
 setState();
+loadPlaylists();

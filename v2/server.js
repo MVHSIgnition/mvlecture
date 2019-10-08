@@ -54,6 +54,25 @@ function updateTitleAndDescription(title, oauthToken) {
   });
 }
 
+function addVideoToPlaylist(videoId, playlistId, oauthToken) {
+  return fetch('https://www.googleapis.com/youtube/v3/playlistItems?part=snippet', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + oauthToken
+    },
+    body: JSON.stringify({
+      snippet: {
+        playlistId,
+        resourceId: {
+          kind: 'youtube#video',
+          videoId
+        }
+      }
+    })
+  }).then(res => res.json());
+}
+
 // bookmarks api
 app.post('/api/set-bookmarks', (req, res) => {
   if (!stream.isStreaming) {
@@ -124,7 +143,8 @@ app.post('/api/init-stream', async (req, res) => {
   // get and validate data from frontend
   let {
     oauthToken,
-    title
+    title,
+    playlistId
   } = req.body;
 
   if (!title || !oauthToken) {
@@ -200,11 +220,14 @@ app.post('/api/init-stream', async (req, res) => {
     headers
   });
   data = await data.json();
-
   stream.startTime = Date.now();
 
-  // spin-up ffmpeg to begin feeding video and audio the rtmp url
+  // add to playlist
+  if (playlistId)
+    await addVideoToPlaylist(stream.youtubeId, playlistId, oauthToken);
 
+
+  // spin-up ffmpeg to begin feeding video and audio the rtmp url
   const webcam1 = {
     name: 'Logitech Webcam C930e',
     resolution: '1920x1080',
@@ -231,11 +254,11 @@ app.post('/api/init-stream', async (req, res) => {
     }
 
     console.log(stdout, stderr);
-  });
 
-  stream.isStreaming = true;
-  res.send({
-    success: true
+    stream.isStreaming = true;
+    res.send({
+      success: true
+    });
   });
 });
 
