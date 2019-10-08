@@ -62,7 +62,7 @@ function setStreaming(isStreaming) {
 function updateYoutubeDescription() {
     let title = document.getElementById('title').value;
     let credits = 'Written by the MVHS Ignition Club\n\nMain project leads:\n    Jonathan Liu and Erik Zhang\nProject Manager:\n    Erik Zhang\nSoftware backend:\n    Jonathan Liu\nUser interface + bookmarks:\n    Arjun Patrawala\nHardware:\n    Ian Schneider';
-    let description = `Bookmarks: \n${credits}`;
+    let description = `Bookmarks: \n\n${credits}`;
 
     return fetch('../api/update-stream', {
         method: 'POST',
@@ -81,6 +81,7 @@ function updateYoutubeDescription() {
 }
 
 function startEndStream() {
+    checkValidToken();
     document.getElementById('startBtn').disabled = true;
 
     if (!isStreaming) {
