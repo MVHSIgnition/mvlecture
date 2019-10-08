@@ -291,7 +291,7 @@ function loadPlaylists() {
         for (let i = 0; i < items.length; i++) {
             let opt = document.createElement('option');
             opt.value = items[i].id;
-            opt.innerText = items[0].snippet.title;
+            opt.innerText = items[i].snippet.title;
             playlistSelect.appendChild(opt);
         }
     });
