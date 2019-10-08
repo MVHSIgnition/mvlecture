@@ -10,3 +10,5 @@ function generateDescription(bookmarks) {
 
     return text;
 }
+
+module.exports = { generateDescription };

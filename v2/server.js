@@ -63,11 +63,11 @@ app.post('/api/set-bookmarks', (req, res) => {
     });
   }
 
-  if (!req.body.bookmarks) {
+  if (typeof req.body.bookmarks !== 'object') {
     return res.send({
       success: false,
       error: 'missing_data'
-    })
+    });
   }
 
   stream.bookmarks = req.body.bookmarks;
