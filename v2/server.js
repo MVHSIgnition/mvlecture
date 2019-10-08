@@ -205,19 +205,19 @@ app.post('/api/init-stream', async (req, res) => {
 
   // spin-up ffmpeg to begin feeding video and audio the rtmp url
 
-  /*const webcam1 = {
+  const webcam1 = {
     name: 'Logitech Webcam C930e',
     resolution: '1920x1080',
     framerate: 30,
   };
   const micName = 'Microphone (Realtek High Definition Audio)';
-  */
-  const webcam1 = {
+  
+  /*const webcam1 = {
     name: 'HD WebCam',
     resolution: '1280x720',
     framerate: 30,
   };
-  const micName = 'Microphone Array (Realtek High Definition Audio(SST))';
+  const micName = 'Microphone Array (Realtek High Definition Audio(SST))';*/
 
   const localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
