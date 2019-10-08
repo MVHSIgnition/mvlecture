@@ -124,7 +124,7 @@ function createBookmark() {
         document.getElementById('error').style.display = 'none';
 
         fetch('../api/get-state').then(res => res.json()).then(res => {
-            var msDif = Date.now() - startDate.getTime();
+            var msDif = Date.now() - stream.startTime;
             let name = document.getElementById('nameOfBookmark').value;
             document.getElementById('nameOfBookmark').value = '';
 
