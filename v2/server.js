@@ -65,10 +65,10 @@ app.post('/api/delete-bookmark', (req, res) => {
     });
   }
 
-  stream.bookmarks = stream.bookmarks.filter(a => !a.time);
+  stream.bookmarks = stream.bookmarks.filter(a => a.time !== req.body.time);
 
   res.send({
-    success: false
+    success: true
   });
 });
 
