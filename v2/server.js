@@ -1,7 +1,7 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const { exec } = require('child_process');
-const { getTimeout } = require('./helpers.js');
+const { generateDescription } = require('./helpers.js');
 const FileCleaner = require('cron-file-cleaner').FileCleaner;
 
 const app = express();
@@ -10,6 +10,7 @@ app.use(express.json());
 app.use(express.static(__dirname + '/static/'))
 
 const localVideoDirName = __dirname + '/videos/';
+
 let stream = null;
 clearStream();
 
@@ -19,11 +20,9 @@ function clearStream() {
 
     // user provided values
     title: null,
-    description: null,
     bookmarks: [],
 
     // google provided values
-    oauthToken: null,
     streamId: null,
     youtubeId: null,
     rtmpAddr: null,
@@ -31,8 +30,32 @@ function clearStream() {
   }
 }
 
+function updateTitleAndDescription(title, oauthToken) {
+  return fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet', {
+    method: 'PUT',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + oauthToken,
+    },
+    body: JSON.stringify({
+      id: stream.youtubeId,
+      snippet: {
+        title,
+        description: generateDescription(stream.bookmarks),
+        scheduledStartTime: stream.scheduledStartTime,
+      }
+    })
+  }).then(res => res.json()).then(data => {
+    if (!data.error) {
+      stream.title = title;
+    }
+
+    return data;
+  });
+}
+
 // bookmarks api
-app.post('/api/create-bookmark', (req, res) => {
+app.post('/api/set-bookmarks', (req, res) => {
   if (!stream.isStreaming) {
     return res.send({
       success: false,
@@ -40,33 +63,14 @@ app.post('/api/create-bookmark', (req, res) => {
     });
   }
 
-  stream.bookmarks.push({
-    time: getTimeout(Date.now() - stream.startTime),
-    name: req.body.name || 'Untitled bookmark'
-  });
-
-  res.send({
-    success: false
-  });
-});
-
-
-app.post('/api/delete-bookmark', (req, res) => {
-  if (!stream.isStreaming) {
+  if (!req.body.bookmarks) {
     return res.send({
       success: false,
-      error: 'not_streaming'
-    });
+      error: 'missing_data'
+    })
   }
 
-  if (typeof req.body.time !== 'number') {
-    return res.send({
-      success: false,
-      error: 'bad_data'
-    });
-  }
-
-  stream.bookmarks = stream.bookmarks.filter(a => a.time !== req.body.time);
+  stream.bookmarks = req.body.bookmarks;
 
   res.send({
     success: true
@@ -87,27 +91,19 @@ app.post('/api/update-stream', async (req, res) => {
     return res.send({
       success: false,
       error: 'not_streaming'
+    });
+  }
+
+  let { oauthToken } = req.body;
+
+  if (!oauthToken) {
+    return res.send({
+      success: false,
+      error: 'no_oauth_token'
     })
   }
 
-  let { title, description } = req.body;
-
-  let data = await fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet', {
-    method: 'PUT',
-    headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + stream.oauthToken,
-    },
-    body: JSON.stringify({
-      id: stream.youtubeId,
-      snippet: {
-        description,
-        title,
-        scheduledStartTime: stream.scheduledStartTime,
-      }
-    })
-  });
-  data = data.json();
+  let data = await updateTitleAndDescription(req.body.title, oauthToken);
 
   if (data.error) {
     return res.send({
@@ -115,9 +111,6 @@ app.post('/api/update-stream', async (req, res) => {
       error: data.error
     });
   }
-
-  stream.title = title;
-  stream.description = description;
 
   res.send({ success: true });
 });
@@ -142,7 +135,6 @@ app.post('/api/init-stream', async (req, res) => {
   }
 
   stream.title = title;
-  stream.oauthToken = oauthToken;
 
   // create livestream rtmpAddr 
   const headers = {
@@ -247,11 +239,21 @@ app.post('/api/init-stream', async (req, res) => {
 });
 
 app.post('/api/stop-streaming', async (req, res) => {
+
   console.log('RECEIVED STOP COMMAND');
   if (!stream.isStreaming) {
     return res.send({
       success: false,
       error: 'not_streaming'
+    })
+  }
+
+  let { oauthToken } = req.body;
+
+  if (!oauthToken) {
+    return res.send({
+      success: false,
+      error: 'no_oauth_token'
     })
   }
 
@@ -272,10 +274,12 @@ app.post('/api/stop-streaming', async (req, res) => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + stream.oauthToken
+      'Authorization': 'Bearer ' + oauthToken
     }
   });
   data = await data.json();
+
+  await updateTitleAndDescription(stream.title, oauthToken);
 
   console.log('GOT DATA FROM GOOGLE');
 

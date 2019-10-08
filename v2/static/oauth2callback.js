@@ -1,3 +1,85 @@
+class BookmarksManager {
+    constructor() {
+        this.bookmarks = [];
+        this.render();
+    }
+
+    render() {
+        document.getElementById('bookmarks').innerHTML = this.toHTMLString();
+    }
+
+    toHTMLString() {
+        let html = '';
+
+        for (let i = 0; i < this.bookmarks.length; i++) {
+            let bookmark = this.bookmarks[i];
+            html += `
+                <div class="each-bookmark">
+                    ${bookmark.name} — ${bookmark.time}
+                    <button class="edit-btn" onclick="bookmarksManager.edit(${i})">Edit</button>
+                    <button class="remove-btn" onclick="bookmarksManager.remove(${i})">X</button>
+                </div>
+                <br>
+            `;
+        }
+
+        return html;
+    }
+
+    add(time, name) {
+        this.bookmarks.push({
+            time,
+            name: name || 'Untitled bookmark'
+        });
+        
+        this.save();
+        this.render();
+    }
+
+    save() {
+        fetch('../api/set-bookmarks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                bookmarks: this.bookmarks
+            })
+        });
+    }
+
+    edit(i = 0) {
+        let newName = prompt('What should the name of this bookmark be?', this.bookmarks[i].name);
+
+        if (newName) {
+            this.bookmarks[i].name = newName;
+        }
+
+        this.save();
+        this.render();
+    }
+
+    remove(i = 0) {
+        this.bookmarks.splice(i, 1);
+        this.save();
+        this.render();
+    }
+
+    clearAll() {
+        this.bookmarks = [];
+        this.save();
+        this.render();
+    }
+
+    setBookmarks(bookmarks) {
+        this.bookmarks = bookmarks;
+        this.render();
+    }
+}
+
+let bookmarksManager = new BookmarksManager();
+
+
 if (!window.location.hash) { // if people go to this page without first signing into Google
     window.location.href = '/';
 }
@@ -10,6 +92,47 @@ var isStreaming;
 /*************
  * FUNCTIONS *
  *************/
+function getTimestamp(ms) {
+    if (ms > 0) {
+        var s, m, h;
+        s = Math.floor(ms / 1000);
+        m = Math.floor(s / 60);
+        h = Math.floor(m / 60);
+        s %= 60;
+        m %= 60;
+
+        var fmt = '';
+        if (Math.floor(h / 10) == 0)
+            fmt += '0';
+        fmt += h + ':';
+        if (Math.floor(m / 10) == 0)
+            fmt += '0';
+        fmt += m + ':';
+        if (Math.floor(s / 10) == 0)
+            fmt += '0';
+        fmt += s;
+        
+        return fmt;
+    } else {
+        return '00:00:00';
+    }
+}
+
+function createBookmark() {
+    if (isStreaming) {
+        document.getElementById('error').innerHTML = '';
+        document.getElementById('error').style.display = 'none';
+
+        fetch('../api/get-state').then(res => res.json()).then(res => {
+            var msDif = Date.now() - startDate.getTime();
+            let name = document.getElementById('nameOfBookmark').value;
+            document.getElementById('nameOfBookmark').value = '';
+
+            bookmarksManager.add(getTimestamp(msDif), name);
+        });       
+    }
+}
+
 function thereIsAnError(error) {
     if (error) {
         console.log('Error:', error);
@@ -59,27 +182,6 @@ function setStreaming(isStreaming) {
     }
 }
 
-function updateYoutubeDescription() {
-    let title = document.getElementById('title').value;
-    let credits = 'Written by the MVHS Ignition Club\n\nMain project leads:\n    Jonathan Liu and Erik Zhang\nProject Manager:\n    Erik Zhang\nSoftware backend:\n    Jonathan Liu\nUser interface + bookmarks:\n    Arjun Patrawala\nHardware:\n    Ian Schneider';
-    let description = `Bookmarks: \n\n${credits}`;
-
-    return fetch('../api/update-stream', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            title: title,
-            description: description
-        })
-    }).then(res => res.json()).then(data => {
-        if (!data.success) {
-            thereIsAnError(data.error);
-        }
-    });
-}
-
 function startEndStream() {
     checkValidToken();
     document.getElementById('startBtn').disabled = true;
@@ -119,32 +221,36 @@ function startEndStream() {
 
         setTimeout(() => {
             // Stop the stream
-            updateYoutubeDescription().then(() => {
-                fetch('../api/stop-streaming', {
-                    method: 'POST'
-                }).then(res => res.json()).then(data => {
-                    if (!data.success) {
-                        thereIsAnError(data.error);
-                    } else {
-                        setStreaming(false);
-                    }
+            fetch('../api/stop-streaming', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    oauthToken: params.access_token
+                })
+            }).then(res => res.json()).then(data => {
+                if (!data.success) {
+                    thereIsAnError(data.error);
+                } else {
+                    setStreaming(false);
+                }
 
-                    setState();
-                });
+                setState();
             });
         }, 3000);
     }
 }
 
 function setState() {
-    fetch('../api/state', {
-        method: 'GET'
-    }).then(res => res.json()).then(data => {
+    fetch('../api/state').then(res => res.json()).then(data => {
         let stream = data.stream;
         
         isStreaming = stream.isStreaming;
         setStreaming(stream.isStreaming);
         document.getElementById('title').value = stream.title;
+
+        bookmarksManager.setBookmarks(stream.bookmarks);
         
         let youtubeLink = 'https://youtu.be/' + stream.youtubeId;
         let youtubeLinkElement = document.getElementById('youtubeLink');
