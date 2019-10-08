@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<title>Livestream Controller</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link href="https://fonts.googleapis.com/css?family=Lato" rel="stylesheet">
+
+		<link rel="stylesheet" href="style.css">
+	</head>
+	<body>
+		<div class="content">
+			<div style="box-shadow: 0 0.2rem 0.4rem rgba(0,0,0,.23); width: 100%; background: #fff;">
+				<h1 style="padding: 14px;">Livestream Controller</h1>
+			</div>
+
+			<div style="padding: 30px;">
+				<div id="error" style="border-left: red 6px solid; border-radius: 10px; background: #eeeeee; font-size: 18px; color: #000; border-bottom-left-radius: 0; border-top-left-radius: 0; padding: 6px 10px; display: none;"></div>
+
+				<div id="success" style="border-left: red 6px solid; border-radius: 10px; background: #00ff00; font-size: 18px; color: #000; border-bottom-left-radius: 0; border-top-left-radius: 0; margin: 16px; padding: 6px 10px; display: none;"></div>
+				
+				<div id="youtubeLinkDiv" class="area" style="display:none;">
+					<h2>Your stream is now live at: <a href="https://youtu.be/" target="_blank" id="youtubeLink">https://youtu.be/</a>!</h2>
+				</div>
+
+				<div class="area">
+					<h2>What is the title of this stream?</h2>
+					<br>
+					<input type="text" id="title" placeholder="Type here...">
+					<br><br>
+					<button id="startBtn" onclick="startEndStream()">Start Streaming</button>
+				</div>
+
+				<div id="bookmarksDiv" class="area" style="display: none;">
+					<h2>Bookmarks</h2>
+					<br>
+					<ul id="bookmarks"></ul>
+					<br><br>
+					<h3>What is the name of this bookmark?</h3>
+					<input type="text" id="nameOfBookmark" placeholder="Type here...">
+					<br><br>
+					<button class="button" style="width: 200px;" onclick="markTimestamp()">Add Bookmark Now</button>
+				</div>
+			</div>
+		</div>
+
+		<br><br><br>
+		<div class="credits">
+			<h4>Written by the MVHS Ignition Club</h4>
+			<br>
+			<b>Main project leads:</b>
+				<p class="tabbed">Jonathan Liu and Erik Zhang</p>
+			<b>Project manager:</b>
+				<p class="tabbed">Erik Zhang</p>
+			<b>Software backend:</b>
+				<p class="tabbed">Jonathan Liu</p>
+			<b>User interface + bookmarks:</b>
+				<p class="tabbed">Arjun Patrawala</p>
+			<b>Hardware:</b>
+				<p class="tabbed">Ian Schneider and Rishon Shah</p>
+		</div>
+
+		<script type="text/javascript" src="oauth2callback.js"></script>
+	</body>
+</html>
