@@ -1,6 +1,7 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const { exec } = require('child_process');
+const { getTimeout } = require('./helpers.js');
 
 const app = express();
 
@@ -16,15 +17,109 @@ function clearStream() {
     // user provided values
     title: null,
     description: null,
+    bookmarks: [],
 
     // google provided values
     oauthToken: null,
     streamId: null,
     youtubeId: null,
     rtmpAddr: null,
+    startTime: null
   }
 }
 
+// bookmarks api
+app.post('/api/create-bookmark', (req, res) => {
+  if (!stream.isStreaming) {
+    return res.send({
+      success: false,
+      error: 'not_streaming'
+    });
+  }
+
+  stream.bookmarks.push({
+    time: getTimeout(Date.now() - stream.startTime),
+    name: req.body.name || 'Untitled bookmark'
+  });
+
+  res.send({
+    success: false
+  });
+});
+
+
+app.post('/api/delete-bookmark', (req, res) => {
+  if (!stream.isStreaming) {
+    return res.send({
+      success: false,
+      error: 'not_streaming'
+    });
+  }
+
+  if (typeof req.body.time !== 'number') {
+    return res.send({
+      success: false,
+      error: 'bad_data'
+    });
+  }
+
+  stream.bookmarks = stream.bookmarks.filter(a => !a.time);
+
+  res.send({
+    success: false
+  });
+});
+
+// state stuff
+app.get('/api/state', (req, res) => {
+  res.send({
+    success: true,
+    data: stream
+  });
+});
+
+app.post('/api/update-stream', async (req, res) => {
+
+  if (!stream.isStreaming) {
+    return res.send({
+      success: false,
+      error: 'not_streaming'
+    })
+  }
+
+  let { title, description } = req.body;
+
+  let data = await fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet', {
+    method: 'PUT',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + stream.oauthToken,
+    },
+    body: JSON.stringify({
+      id: stream.youtubeId,
+      snippet: {
+        description,
+        title,
+        scheduledStartTime: stream.scheduledStartTime,
+      }
+    })
+  });
+  data = data.json();
+
+  if (data.error) {
+    return res.send({
+      success: false,
+      error: data.error
+    });
+  }
+
+  stream.title = title;
+  stream.description = description;
+
+  res.send({ success: true });
+});
+
+// streaming apis
 app.post('/api/init-stream', async (req, res) => {
   if (stream.isStreaming) {
     return res.send({ success: false, error: 'already_streaming' });
@@ -111,6 +206,8 @@ app.post('/api/init-stream', async (req, res) => {
   });
   data = await data.json();
 
+  stream.startTime = Date.now();
+
   // spin-up ffmpeg to begin feeding video and audio the rtmp url
 
   const webcam1 = {
@@ -137,54 +234,6 @@ app.post('/api/init-stream', async (req, res) => {
 
     console.log(stdout, stderr);
   });
-});
-
-app.get('/api/state', (req, res) => {
-  res.send({
-    success: true,
-    data: stream
-  })
-});
-
-app.post('/api/update-stream', async (req, res) => {
-
-  if (!stream.isStreaming) {
-    return res.send({
-      success: false,
-      error: 'not_streaming'
-    })
-  }
-
-  let { title, description } = req.body;
-
-  let data = await fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet', {
-    method: 'PUT',
-    headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + stream.oauthToken,
-    },
-    body: JSON.stringify({
-      id: stream.youtubeId,
-      snippet: {
-        description,
-        title,
-        scheduledStartTime: stream.scheduledStartTime,
-      }
-    })
-  });
-  data = data.json();
-
-  if (data.error) {
-    return res.send({
-      success: false,
-      error: data.error
-    });
-  }
-
-  stream.title = title;
-  stream.description = description;
-
-  res.send({ success: true });
 });
 
 app.post('/api/stop-streaming', (req, res) => {
@@ -222,6 +271,7 @@ app.post('/api/stop-streaming', (req, res) => {
     });
   });
 });
+
 
 let listener = app.listen(process.env.PORT || 1266, () => {
   let port = listener.address().port;
