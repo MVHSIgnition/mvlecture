@@ -74,7 +74,7 @@ function addVideoToPlaylist(videoId, playlistId, oauthToken) {
 }
 
 // bookmarks api
-app.post('/api/set-bookmarks', (req, res) => {
+app.post('/api/set-bookmarks', async (req, res) => {
   if (!stream.isStreaming) {
     return res.send({
       success: false,
