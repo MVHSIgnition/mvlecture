@@ -1,17 +1,29 @@
 {
-  "name": "v2",
+  "name": "mvspeakers",
   "version": "1.0.0",
   "description": "",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node index"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MVHSIgnition/mvspeakers.git"
   },
   "author": "",
   "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MVHSIgnition/mvspeakers/issues"
+  },
+  "homepage": "https://github.com/MVHSIgnition/mvspeakers#readme",
   "dependencies": {
+    "body-parser": "^1.18.3",
     "cron-file-cleaner": "^1.1.0",
     "express": "^4.17.1",
-    "node-fetch": "^2.6.0"
+    "ffmpeg.js": "^3.1.9001",
+    "fluent-ffmpeg": "^2.1.2",
+    "node-fetch": "^2.6.0",
+    "url": "^0.11.0"
   }
 }
