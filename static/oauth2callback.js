@@ -274,7 +274,8 @@ function setState() {
         
         isStreaming = stream.isStreaming;
         setStreaming(stream.isStreaming);
-        document.getElementById('title').value = stream.title;
+        if (stream.isStreaming)
+            document.getElementById('title').value = stream.title;
 
         if (isStreaming) {
             bookmarksManager.setBookmarks(stream.bookmarks);
