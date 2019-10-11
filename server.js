@@ -14,6 +14,19 @@ const localVideoDirName = __dirname + '/videos/';
 let stream = null;
 clearStream();
 
+function getLanIpAddress() {
+  let os = require('os');
+  let ifaces = os.networkInterfaces();
+
+  for (let each in ifaces) {
+    for (let a of ifaces[each]) {
+      if (a.family === 'IPv4' && !a.internal) {
+        return a.address;
+      }
+    }
+  }
+}
+
 function clearStream() {
   stream = {
     isStreaming: false,
@@ -288,16 +301,6 @@ app.post('/api/stop-streaming', async (req, res) => {
     })
   }
 
-  exec('taskkill /im ffmpeg.exe /t /f', (err, stdout, stderr) => {
-    if (err) {
-      console.error(err);
-      return res.send({ success: false, error: err });
-    }
-
-    console.log('stopped ffmpeg');
-    console.log(stdout, stderr)
-  });
-
   // tell google that stream has stopped
   let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id=${stream.youtubeId}&broadcastStatus=complete&part=id`, {
     method: 'POST',
@@ -316,6 +319,22 @@ app.post('/api/stop-streaming', async (req, res) => {
   res.send({
     success: true
   });
+
+  exec('taskkill /im ffmpeg.exe /t /f', (err, stdout, stderr) => {
+    if (err) {
+      console.error(err);
+    }
+
+    console.log('stopped ffmpeg');
+    console.log(stdout, stderr)
+  });
+});
+
+app.get('/api/ip', (req, res) => {
+  res.send({
+    success: true,
+    ip: getLanIpAddress() + ':' + port
+  });
 });
 
 // Delete all files older than 24 hours
@@ -324,7 +343,8 @@ var fileWatcher = new FileCleaner(localVideoDirName, 24*3600000, '* */15 * * * *
   blacklist: '/\.init/'
 });
 
+let port;
 let listener = app.listen(process.env.PORT || 1266, () => {
-  let port = listener.address().port;
+  port = listener.address().port;
   console.log('Server listening on port', port);
 });

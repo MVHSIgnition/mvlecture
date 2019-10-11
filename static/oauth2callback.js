@@ -158,7 +158,11 @@ function checkValidToken() {
 
             // if their token has expired, and they need to sign-in again
             if (data.error === 'invalid_token') {
-                window.location.href = '/';
+                if (location.href.includes('localhost')) {
+                    window.location.href = '/';
+                } else {
+                    window.location.href = '/bad-token.html';
+                }
             }
         })
         .catch(err => thereIsAnError(err));
@@ -263,6 +267,10 @@ function startEndStream() {
 function setState() {
     fetch('../api/state').then(res => res.json()).then(data => {
         let stream = data.stream;
+
+        if (isStreaming && !stream.isStreaming) { // if another computer stops the stream
+            location.reload();
+        }
         
         isStreaming = stream.isStreaming;
         setStreaming(stream.isStreaming);
@@ -304,3 +312,15 @@ function loadPlaylists() {
 checkValidToken();
 setState();
 loadPlaylists();
+
+fetch('../api/ip').then(res => res.json()).then(data => {
+    let { ip } = data;
+    let link = 'http://' + ip + location.pathname + location.hash;
+    document.querySelector('#qrCodeDiv img').src = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${encodeURIComponent(link)}`;
+    // document.querySelector('#qrCodeDiv span').innerText = 'Or enter ' + link + ' in your browser';
+});
+
+// check for any state updates made on other devices every 10 seconds
+setInterval(() => {
+    setState();
+}, 10000);
