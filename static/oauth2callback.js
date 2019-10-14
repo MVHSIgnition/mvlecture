@@ -85,6 +85,7 @@ if (!window.location.hash) { // if people go to this page without first signing 
     window.location.href = '/';
 }
 
+var socket = io();
 // Get url hash contents
 var json_str_escaped = window.location.hash.slice(1);
 var params = JSON.parse('{"' + decodeURI(json_str_escaped).replace(/"/g, '\\"').replace(/&/g, '","').replace(/=/g,'":"') + '"}');
@@ -234,7 +235,7 @@ function startEndStream() {
                 thereIsAnError(data.error);
                 setStreaming(false);
             }
-            setState();
+            //setState();
         });
     } else {
         document.getElementById('error').innerHTML = '';
@@ -258,7 +259,7 @@ function startEndStream() {
                     setStreaming(false);
                 }
 
-                setState();
+                //setState();
             });
         }, 3000);
     }
@@ -311,7 +312,7 @@ function loadPlaylists() {
  * Initialization stuff *
  ************************/
 checkValidToken();
-setState();
+//setState();
 loadPlaylists();
 
 fetch('../api/ip').then(res => res.json()).then(data => {
@@ -321,7 +322,44 @@ fetch('../api/ip').then(res => res.json()).then(data => {
     // document.querySelector('#qrCodeDiv span').innerText = 'Or enter ' + link + ' in your browser';
 });
 
-// check for any state updates made on other devices every 10 seconds
-setInterval(() => {
-    setState();
-}, 10000);
+/****************
+ * Socket stuff *
+ ****************/
+socket.on('update state', (data) => {
+    let stream = data.stream;
+
+    if (isStreaming && !stream.isStreaming) { // if another computer stops the stream
+        location.reload();
+    }
+    
+    isStreaming = stream.isStreaming;
+    setStreaming(stream.isStreaming);
+    document.getElementById('title').value = stream.title;
+    document.getElementById('addDate').checked = stream.addDate;
+    document.getElementById('playlistSelect').selectedIndex = stream.playlist;
+
+    if (isStreaming) {
+        bookmarksManager.setBookmarks(stream.bookmarks);
+    }
+
+    
+    let youtubeLink = 'https://youtu.be/' + stream.youtubeId;
+    let youtubeLinkElement = document.getElementById('youtubeLink');
+    youtubeLinkElement.href = youtubeLink;
+    youtubeLinkElement.innerHTML = youtubeLink;
+});
+
+const titleChanged = (e) => {
+    socket.emit('title changed', document.getElementById('title').value);
+};
+const dateCheckboxChanged = (e) => {
+    socket.emit('date checkbox changed', document.getElementById('addDate').checked);
+};
+const playlistSelectChanged = (e) => {
+    socket.emit('playlist select changed', document.getElementById('playlistSelect').selectedIndex);
+};
+
+document.getElementById('title').addEventListener('input', titleChanged);
+document.getElementById('addDate').addEventListener('change', dateCheckboxChanged);
+document.getElementById('playlistSelect').addEventListener('change', playlistSelectChanged);
+

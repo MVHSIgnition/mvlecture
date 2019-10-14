@@ -1,10 +1,11 @@
 const express = require('express');
+const app = express();
+const http = require('http').createServer(app);
+const io = require('socket.io')(http);
 const fetch = require('node-fetch');
 const { exec } = require('child_process');
 const { generateDescription } = require('./helpers.js');
 const FileCleaner = require('cron-file-cleaner').FileCleaner;
-
-const app = express();
 
 app.use(express.json());
 app.use(express.static(__dirname + '/static/'))
@@ -33,6 +34,8 @@ function clearStream() {
 
     // user provided values
     title: null,
+    addDate: false,
+    playlist: 0,
     bookmarks: [],
 
     // google provided values
@@ -86,6 +89,26 @@ function addVideoToPlaylist(videoId, playlistId, oauthToken) {
   }).then(res => res.json());
 }
 
+// socket.io
+io.on('connection', (socket) => {
+  io.emit('update state', {stream: stream});
+
+  socket.on('title changed', (title) => {
+    stream.title = title;
+    io.emit('update state', {stream: stream});
+  });
+
+  socket.on('date checkbox changed', (checked) => {
+    stream.addDate = checked;
+    io.emit('update state', {stream: stream});
+  });
+
+  socket.on('playlist select changed', (index) => {
+    stream.playlist = index;
+    io.emit('update state', {stream: stream});
+  });
+});
+
 // bookmarks api
 app.post('/api/set-bookmarks', async (req, res) => {
   if (!stream.isStreaming) {
@@ -109,6 +132,8 @@ app.post('/api/set-bookmarks', async (req, res) => {
   });
 
   await updateTitleAndDescription(stream.title, req.body.oauthToken);
+
+  io.emit('update state', {stream: stream});
 });
 
 // state stuff
@@ -147,6 +172,8 @@ app.post('/api/update-stream', async (req, res) => {
   }
 
   res.send({ success: true });
+
+  io.emit('update state', {stream: stream});
 });
 
 // streaming apis
@@ -281,6 +308,8 @@ app.post('/api/init-stream', async (req, res) => {
 
   // update initial description
   await updateTitleAndDescription(stream.title, oauthToken);
+
+  io.emit('update state', {stream: stream});
 });
 
 app.post('/api/stop-streaming', async (req, res) => {
@@ -328,6 +357,8 @@ app.post('/api/stop-streaming', async (req, res) => {
     console.log('stopped ffmpeg');
     console.log(stdout, stderr)
   });
+
+  io.emit('update state', {stream: stream});
 });
 
 app.get('/api/ip', (req, res) => {
@@ -344,7 +375,7 @@ var fileWatcher = new FileCleaner(localVideoDirName, 24*3600000, '* */15 * * * *
 });
 
 let port;
-let listener = app.listen(process.env.PORT || 1266, () => {
+let listener = http.listen(process.env.PORT || 1266, () => {
   port = listener.address().port;
   console.log('Server listening on port', port);
 });
