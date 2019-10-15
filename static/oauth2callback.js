@@ -1,85 +1,4 @@
-class BookmarksManager {
-    constructor() {
-        this.bookmarks = [];
-        this.render();
-    }
-
-    render() {
-        document.getElementById('bookmarks').innerHTML = this.toHTMLString();
-    }
-
-    toHTMLString() {
-        let html = '';
-
-        for (let i = 0; i < this.bookmarks.length; i++) {
-            let bookmark = this.bookmarks[i];
-            html += `
-                <div class="each-bookmark">
-                    ${bookmark.name} — ${bookmark.time}
-                    <button class="edit-btn" onclick="bookmarksManager.edit(${i})">Edit</button>
-                    <button class="remove-btn" onclick="bookmarksManager.remove(${i})">X</button>
-                </div>
-                <br>
-            `;
-        }
-
-        return html;
-    }
-
-    add(time, name) {
-        this.bookmarks.push({
-            time,
-            name: name || 'Untitled bookmark'
-        });
-        
-        this.save();
-        this.render();
-    }
-
-    save() {
-        fetch('../api/set-bookmarks', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                bookmarks: this.bookmarks,
-                oauthToken: params.access_token
-            })
-        });
-    }
-
-    edit(i = 0) {
-        let newName = prompt('What should the name of this bookmark be?', this.bookmarks[i].name);
-
-        if (newName) {
-            this.bookmarks[i].name = newName;
-        }
-
-        this.save();
-        this.render();
-    }
-
-    remove(i = 0) {
-        this.bookmarks.splice(i, 1);
-        this.save();
-        this.render();
-    }
-
-    clearAll() {
-        this.bookmarks = [];
-        this.save();
-        this.render();
-    }
-
-    setBookmarks(bookmarks) {
-        this.bookmarks = bookmarks;
-        this.render();
-    }
-}
-
 let bookmarksManager = new BookmarksManager();
-
 
 if (!window.location.hash) { // if people go to this page without first signing into Google
     window.location.href = '/';
@@ -90,6 +9,7 @@ var socket = io();
 var json_str_escaped = window.location.hash.slice(1);
 var params = JSON.parse('{"' + decodeURI(json_str_escaped).replace(/"/g, '\\"').replace(/&/g, '","').replace(/=/g,'":"') + '"}');
 var isStreaming;
+let stream = null;
 
 /*************
  * FUNCTIONS *
@@ -135,14 +55,11 @@ function createBookmark() {
     if (isStreaming) {
         thereIsAnError(null);
 
-        fetch('../api/state').then(res => res.json()).then(data => {
-            let stream = data.stream;
-            var msDif = Date.now() - stream.startTime;
-            let name = document.getElementById('nameOfBookmark').value;
-            document.getElementById('nameOfBookmark').value = '';
+        var msDif = Date.now() - stream.startTime;
+        let name = document.getElementById('nameOfBookmark').value;
+        document.getElementById('nameOfBookmark').value = '';
 
-            bookmarksManager.add(getTimestamp(msDif), name);
-        });       
+        bookmarksManager.add(getTimestamp(msDif), name);   
     }
 }
 
@@ -265,31 +182,6 @@ function startEndStream() {
     }
 }
 
-function setState() {
-    fetch('../api/state').then(res => res.json()).then(data => {
-        let stream = data.stream;
-
-        if (isStreaming && !stream.isStreaming) { // if another computer stops the stream
-            location.reload();
-        }
-        
-        isStreaming = stream.isStreaming;
-        setStreaming(stream.isStreaming);
-        if (stream.isStreaming)
-            document.getElementById('title').value = stream.title;
-
-        if (isStreaming) {
-            bookmarksManager.setBookmarks(stream.bookmarks);
-        }
-
-        
-        let youtubeLink = 'https://youtu.be/' + stream.youtubeId;
-        let youtubeLinkElement = document.getElementById('youtubeLink');
-        youtubeLinkElement.href = youtubeLink;
-        youtubeLinkElement.innerHTML = youtubeLink;
-    });
-}
-
 function loadPlaylists() {
     fetch('https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true', {
         headers: {
@@ -312,54 +204,48 @@ function loadPlaylists() {
  * Initialization stuff *
  ************************/
 checkValidToken();
-//setState();
 loadPlaylists();
 
 fetch('../api/ip').then(res => res.json()).then(data => {
     let { ip } = data;
     let link = 'http://' + ip + location.pathname + location.hash;
     document.querySelector('#qrCodeDiv img').src = `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${encodeURIComponent(link)}`;
-    // document.querySelector('#qrCodeDiv span').innerText = 'Or enter ' + link + ' in your browser';
 });
 
 /****************
  * Socket stuff *
  ****************/
-socket.on('update state', (data) => {
-    let stream = data.stream;
+socket.on('update state', data => {
+    stream = data.stream;
 
-    if (isStreaming && !stream.isStreaming) { // if another computer stops the stream
-        location.reload();
+    if (!stream.isStreaming) {
+        document.getElementById('title').value = stream.uiState.title;
+        document.getElementById('addDate').checked = stream.uiState.addDate;
+        setTimeout(() => { // needs a second to load playlists
+            document.getElementById('playlistSelect').selectedIndex = stream.uiState.playlist;
+        }, 500);
+    } else {
+        title.value = stream.title;
+        bookmarksManager.setBookmarks(stream.bookmarks);
+        let link = 'https://youtu.be/' + stream.youtubeId;
+        youtubeLink.href = link;
+        youtubeLink.innerHTML = link;
+        nameOfBookmark.value = stream.uiState.bookmarkName;
     }
-    
+
     isStreaming = stream.isStreaming;
     setStreaming(stream.isStreaming);
-    document.getElementById('title').value = stream.title;
-    document.getElementById('addDate').checked = stream.addDate;
-    document.getElementById('playlistSelect').selectedIndex = stream.playlist;
-
-    if (isStreaming) {
-        bookmarksManager.setBookmarks(stream.bookmarks);
-    }
-
-    
-    let youtubeLink = 'https://youtu.be/' + stream.youtubeId;
-    let youtubeLinkElement = document.getElementById('youtubeLink');
-    youtubeLinkElement.href = youtubeLink;
-    youtubeLinkElement.innerHTML = youtubeLink;
 });
 
-const titleChanged = (e) => {
-    socket.emit('title changed', document.getElementById('title').value);
-};
-const dateCheckboxChanged = (e) => {
-    socket.emit('date checkbox changed', document.getElementById('addDate').checked);
-};
-const playlistSelectChanged = (e) => {
-    socket.emit('playlist select changed', document.getElementById('playlistSelect').selectedIndex);
-};
-
-document.getElementById('title').addEventListener('input', titleChanged);
-document.getElementById('addDate').addEventListener('change', dateCheckboxChanged);
-document.getElementById('playlistSelect').addEventListener('change', playlistSelectChanged);
-
+title.addEventListener('input', () => {
+    socket.emit('title changed', title.value);
+});
+addDate.addEventListener('change', () => {
+    socket.emit('date checkbox changed', addDate.checked);
+});
+playlistSelect.addEventListener('change', () => {
+    socket.emit('playlist select changed', playlistSelect.selectedIndex);
+});
+nameOfBookmark.addEventListener('input', () => {
+    socket.emit('bookmark name changed', nameOfBookmark.value);
+})

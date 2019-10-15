@@ -1,11 +1,12 @@
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
-const io = require('socket.io')(http);
 const fetch = require('node-fetch');
 const { exec } = require('child_process');
 const { generateDescription } = require('./helpers.js');
+
 const FileCleaner = require('cron-file-cleaner').FileCleaner;
+const io = require('socket.io')(http);
 
 app.use(express.json());
 app.use(express.static(__dirname + '/static/'))
@@ -33,16 +34,19 @@ function clearStream() {
     isStreaming: false,
 
     // user provided values
-    title: null,
-    addDate: false,
-    playlist: 0,
     bookmarks: [],
 
     // google provided values
     streamId: null,
     youtubeId: null,
     rtmpAddr: null,
-    startTime: null
+    startTime: null,
+    uiState: {
+      title: '',
+      addDate: false,
+      playlist: 0,
+      bookmarkName: ''
+    }
   }
 }
 
@@ -89,23 +93,32 @@ function addVideoToPlaylist(videoId, playlistId, oauthToken) {
   }).then(res => res.json());
 }
 
+function streamUpdated() {
+  io.emit('update state', { stream });  
+}
+
 // socket.io
 io.on('connection', (socket) => {
-  io.emit('update state', {stream: stream});
+  streamUpdated();
 
-  socket.on('title changed', (title) => {
-    stream.title = title;
-    io.emit('update state', {stream: stream});
+  socket.on('title changed', title => {
+    stream.uiState.title = title;
+    streamUpdated();
   });
 
-  socket.on('date checkbox changed', (checked) => {
-    stream.addDate = checked;
-    io.emit('update state', {stream: stream});
+  socket.on('date checkbox changed', checked => {
+    stream.uiState.addDate = checked;
+    streamUpdated();
   });
 
-  socket.on('playlist select changed', (index) => {
-    stream.playlist = index;
-    io.emit('update state', {stream: stream});
+  socket.on('playlist select changed', index => {
+    stream.uiState.playlist = index;
+    streamUpdated();
+  });
+
+  socket.on('bookmark name changed', value => {
+    stream.uiState.bookmarkName = value;
+    streamUpdated();
   });
 });
 
@@ -131,17 +144,10 @@ app.post('/api/set-bookmarks', async (req, res) => {
     success: true
   });
 
+  stream.uiState.bookmarkName = '';
+  streamUpdated();
+
   await updateTitleAndDescription(stream.title, req.body.oauthToken);
-
-  io.emit('update state', {stream: stream});
-});
-
-// state stuff
-app.get('/api/state', (req, res) => {
-  res.send({
-    success: true,
-    stream: stream
-  });
 });
 
 app.post('/api/update-stream', async (req, res) => {
@@ -173,7 +179,7 @@ app.post('/api/update-stream', async (req, res) => {
 
   res.send({ success: true });
 
-  io.emit('update state', {stream: stream});
+  streamUpdated();
 });
 
 // streaming apis
@@ -297,8 +303,6 @@ app.post('/api/init-stream', async (req, res) => {
     }
 
     console.log(stdout, stderr);
-
-    
   });
   
   stream.isStreaming = true;
@@ -309,7 +313,7 @@ app.post('/api/init-stream', async (req, res) => {
   // update initial description
   await updateTitleAndDescription(stream.title, oauthToken);
 
-  io.emit('update state', {stream: stream});
+  streamUpdated();
 });
 
 app.post('/api/stop-streaming', async (req, res) => {
@@ -358,7 +362,7 @@ app.post('/api/stop-streaming', async (req, res) => {
     console.log(stdout, stderr)
   });
 
-  io.emit('update state', {stream: stream});
+  streamUpdated();
 });
 
 app.get('/api/ip', (req, res) => {
