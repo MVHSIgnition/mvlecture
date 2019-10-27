@@ -4,7 +4,7 @@ const http = require('http').createServer(app);
 const fetch = require('node-fetch');
 const fs = require('fs');
 const { exec } = require('child_process');
-const { generateDescription } = require('./helpers.js');
+const { generateDescription, indexOfMultiple } = require('./helpers.js');
 
 const FileCleaner = require('cron-file-cleaner').FileCleaner;
 const io = require('socket.io')(http);
@@ -21,6 +21,59 @@ if (!fs.existsSync(localVideoDirName)) {
 
 let stream = null;
 clearStream();
+
+// Get the list of permissible webcams and mics
+const listDevicesCmd = 'ffmpeg -list_devices true -f dshow -i dummy';
+var webcams = [];
+var mics = [];
+
+exec(listDevicesCmd, (error, stdout, stderr) => {
+  // Parse output for webcams and mics
+  const output = error.toString();
+  const videoDevicesIndex = output.indexOf('DirectShow video devices');
+  const audioDevicesIndex = output.indexOf('DirectShow audio devices');
+
+  const indices = indexOfMultiple(output, '"', videoDevicesIndex);
+
+  for (let i = 0; i < indices.length; i++) {
+    if (i+1 < indices.length) {
+      const device = output.substring(indices[i]+1, indices[i+1]);
+      if (indices[i] < audioDevicesIndex && indices[i+1] < audioDevicesIndex) {
+        // These are video devices
+        webcams.push({
+          name: device,
+          resolution: null,
+          framerate: null,
+        });
+      } else {
+        // These are audio devices
+        mics.push(device);
+      }
+      // Skip the "Alternative name"
+      i += 3;
+    }
+  }
+
+  io.emit('update mics', { mics });  
+
+  for (let i = 0; i < webcams.length; i++) {
+    const listOptionsCmd = `ffmpeg -list_options true -f dshow -i video="${webcams[i].name}"`;
+    exec(listOptionsCmd, (error, stdout, stderr) => {
+      const output = error.toString();
+      const deviceOptionsIndex = output.indexOf('DirectShow video device options');
+
+      const resIndex = output.indexOf(' s=', deviceOptionsIndex);
+      const resolution = output.substring(resIndex+3, output.indexOf(' ', resIndex+1));
+      const fpsIndex = output.indexOf('fps=', resIndex);
+      const framerate = output.substring(fpsIndex+4, output.indexOf(' ', fpsIndex));
+      
+      webcams[i].resolution = resolution;
+      webcams[i].framerate = framerate;
+
+      io.emit('update webcams', { webcams });  
+    });
+  }
+});
 
 function getLanIpAddress() {
   let os = require('os');
@@ -41,18 +94,20 @@ function clearStream() {
 
     // user provided values
     bookmarks: [],
+    uiState: {
+      title: '',
+      addDate: false,
+      playlist: 0,
+      bookmarkName: '',
+      webcam: 0,
+      mic: 0,
+    },
 
     // google provided values
     streamId: null,
     youtubeId: null,
     rtmpAddr: null,
     startTime: null,
-    uiState: {
-      title: '',
-      addDate: false,
-      playlist: 0,
-      bookmarkName: ''
-    }
   }
 }
 
@@ -106,6 +161,8 @@ function streamUpdated() {
 // socket.io
 io.on('connection', (socket) => {
   streamUpdated();
+  io.emit('update mics', { mics });  
+  io.emit('update webcams', { webcams });  
 
   socket.on('title changed', title => {
     stream.uiState.title = title;
@@ -119,6 +176,16 @@ io.on('connection', (socket) => {
 
   socket.on('playlist select changed', index => {
     stream.uiState.playlist = index;
+    streamUpdated();
+  });
+
+  socket.on('webcam select changed', index => {
+    stream.uiState.webcam = index;
+    streamUpdated();
+  });
+
+  socket.on('mic select changed', index => {
+    stream.uiState.mic = index;
     streamUpdated();
   });
 
@@ -282,23 +349,12 @@ app.post('/api/init-stream', async (req, res) => {
 
 
   // spin-up ffmpeg to begin feeding video and audio the rtmp url
-  const webcam1 = {
-    name: 'Logitech Webcam C930e',
-    resolution: '1920x1080',
-    framerate: 30,
-  };
-  const micName = 'Microphone (Realtek High Definition Audio)';
-  
-  /*const webcam1 = {
-    name: 'HD WebCam',
-    resolution: '1280x720',
-    framerate: 30,
-  };
-  const micName = 'Microphone Array (Realtek High Definition Audio(SST))';*/
+  const webcam = webcams[stream.uiState.webcam];
+  const micName = mics[stream.uiState.mic];
 
   const localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
-  const cmd = `ffmpeg -y -f dshow -video_size ${webcam1.resolution} -framerate ${webcam1.framerate} -i video="${webcam1.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid];[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset veryfast ${localVideoFilename} -map [vid2] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+  const cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid];[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset veryfast ${localVideoFilename} -map [vid2] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
   //const cmd = `ffmpeg -y -f dshow -video_size ${webcam1.resolution} -framerate ${webcam1.framerate} -i video="${webcam1.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
 
   exec(cmd, (err, stdout, stderr) => {

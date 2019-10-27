@@ -96,22 +96,18 @@ function setStreaming(isStreaming) {
         document.getElementById('bookmarksDiv').style.display = 'block';
         document.getElementById('youtubeLinkDiv').style.display = 'block';
         document.getElementById('startBtn').disabled = false;
-        document.querySelector('label').style.display = 'none';
-        adfjaskdic.style.display = 'none';
         title.disabled = 'true';
-        playlistSelect.style.display = 'none';
-        addDate.style.display = 'none';
+
+        optionsDiv.style.display = 'none';
     } else {
         document.getElementById('startBtn').className = 'button1';
         document.getElementById('startBtn').innerHTML = 'Start Streaming';
         document.getElementById('bookmarksDiv').style.display = 'none';
         document.getElementById('youtubeLinkDiv').style.display = 'none';
         document.getElementById('startBtn').disabled = false;
-        document.querySelector('label').style.display = '';
-        adfjaskdic.style.display = '';
         title.disabled = '';
-        playlistSelect.style.display = '';
-        addDate.style.display = '';
+
+        optionsDiv.style.display = 'block';
     }
 }
 
@@ -224,6 +220,8 @@ socket.on('update state', data => {
         setTimeout(() => { // needs a second to load playlists
             document.getElementById('playlistSelect').selectedIndex = stream.uiState.playlist;
         }, 500);
+        webcamSelect.selectedIndex = stream.uiState.webcam;
+        micSelect.selectedIndex = stream.uiState.mic;
     } else {
         title.value = stream.title;
         bookmarksManager.setBookmarks(stream.bookmarks);
@@ -237,6 +235,28 @@ socket.on('update state', data => {
     setStreaming(stream.isStreaming);
 });
 
+socket.on('update mics', data => {
+    const mics = data.mics;
+    micSelect.length = 0;
+    for (let i = 0; i < mics.length; i++) {
+        let opt = document.createElement('option');
+        opt.value = i;
+        opt.innerText = mics[i];
+        micSelect.appendChild(opt);
+    }
+});
+
+socket.on('update webcams', data => {
+    const webcams = data.webcams;
+    webcamSelect.length = 0;
+    for (let i = 0; i < webcams.length; i++) {
+        let opt = document.createElement('option');
+        opt.value = i;
+        opt.innerText = webcams[i].name;
+        webcamSelect.appendChild(opt);
+    }
+});
+
 title.addEventListener('input', () => {
     socket.emit('title changed', title.value);
 });
@@ -246,6 +266,13 @@ addDate.addEventListener('change', () => {
 playlistSelect.addEventListener('change', () => {
     socket.emit('playlist select changed', playlistSelect.selectedIndex);
 });
+webcamSelect.addEventListener('change', () => {
+    socket.emit('webcam select changed', webcamSelect.selectedIndex);
+});
+micSelect.addEventListener('change', () => {
+    socket.emit('mic select changed', micSelect.selectedIndex);
+});
 nameOfBookmark.addEventListener('input', () => {
     socket.emit('bookmark name changed', nameOfBookmark.value);
-})
+});
+

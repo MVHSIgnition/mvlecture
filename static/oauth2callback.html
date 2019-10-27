@@ -28,14 +28,25 @@
 					<h2>What is the title of this stream?</h2>
 					<br>
 					<input type="text" id="title" placeholder="Type here...">
-					<br><br>
-					<input type="checkbox" id="addDate" style="width: auto; height: auto;">
-					<label for="addDate">Add date to title?</label>
-					<br><br>
-					<h3 id="adfjaskdic">What playlist should this video be in?</h3>
-					<select id="playlistSelect" style="font-size: 18px;">
-						<option value="">None</option>
-					</select>
+
+					<div id="optionsDiv">
+						<br><br>
+						<input type="checkbox" id="addDate" style="width: auto; height: auto;">
+						<label for="addDate">Add date to title?</label>
+						<br><br>
+						<h3>What playlist should this video be in?</h3>
+						<select id="playlistSelect" style="font-size: 18px;">
+							<option value="">None</option>
+						</select>
+						<br><br>
+						<h3>Webcam</h3>
+						<select id="webcamSelect" style="font-size: 18px;">
+						</select>
+						<br><br>
+						<h3>Microphone</h3>
+						<select id="micSelect" style="font-size: 18px;">
+						</select>
+					</div>
 					<br><br>
 					<button id="startBtn" onclick="startEndStream()">Start Streaming</button>
 				</div>

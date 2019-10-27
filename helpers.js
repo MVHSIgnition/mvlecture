@@ -17,4 +17,21 @@ function generateDescription(bookmarks) {
     return text;
 }
 
-module.exports = { generateDescription };
+function indexOfMultiple(source, find, start) {
+	if (!source) {
+	  return [];
+	}
+	// if find is empty string return all indexes.
+	if (!find) {
+	  return source.split('').map((_, i) => i);
+	}
+	var result = [];
+	for (i = start; i < source.length; ++i) {
+	  if (source.substring(i, i + find.length) == find) {
+		result.push(i);
+	  }
+	}
+	return result;
+}
+
+module.exports = { generateDescription, indexOfMultiple };
