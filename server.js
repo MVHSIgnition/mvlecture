@@ -10,6 +10,7 @@ const { google } = require('googleapis');
 const FileCleaner = require('cron-file-cleaner').FileCleaner;
 const io = require('socket.io')(http);
 const url = require('url');
+const readline = require('readline');
 
 // Serve static website files
 app.use(express.json());
@@ -164,6 +165,7 @@ function updateTitleAndDescription(title, oauthToken) {
   });
 }
 
+// TODO: Fix playlists
 function addVideoToPlaylist(videoId, playlistId, oauthToken) {
   return fetch('https://www.googleapis.com/youtube/v3/playlistItems?part=snippet', {
     method: 'POST',
@@ -183,7 +185,7 @@ function addVideoToPlaylist(videoId, playlistId, oauthToken) {
   }).then(res => res.json());
 }
 
-async function uploadVideo() {
+async function uploadVideo(stream) {
   const fileSize = fs.statSync(stream.localVideoFilename).size;
   const res = await youtube.videos.insert(
   {
@@ -193,6 +195,7 @@ async function uploadVideo() {
       snippet: {
         title: stream.title,
         description: generateDescription(stream.bookmarks),
+        categoryId: 27,
       },
       status: {
         privacyStatus: 'public',
@@ -204,11 +207,17 @@ async function uploadVideo() {
   },
   {
     onUploadProgress: evt => {
+      // TODO: Make this an acutal progress bar
       const progress = (evt.bytesRead / fileSize) * 100;
       readline.clearLine(process.stdout, 0);
       readline.cursorTo(process.stdout, 0, null);
       process.stdout.write(`${Math.round(progress)}% complete`);
+      io.emit('update progress', { title: stream.title, progress: Math.round(progress) });
     }
+  }).catch(error => {
+    // TODO: Handle if token not set
+    console.log('THERE WAS AN ERROR');
+    console.log(error);
   });
 
   console.log('\n\n');
@@ -365,7 +374,7 @@ app.post('/api/init-stream', async (req, res) => {
 
   stream.localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
-  const cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -preset veryfast ${stream.localVideoFilename}`;
+  const cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g ${webcam.framerate*2} -c:a aac -b:a 128k -ar 44100 ${stream.localVideoFilename}`;
 
   exec(cmd, (err, stdout, stderr) => {
     console.log('ffmpeg command run');
@@ -394,7 +403,6 @@ app.post('/api/stop-streaming', async (req, res) => {
     })
   }
 
-  clearStream();
   res.send({
     success: true
   });
@@ -404,12 +412,12 @@ app.post('/api/stop-streaming', async (req, res) => {
       console.error(err);
     }
 
-    uploadVideo();
+    uploadVideo(stream);
+    clearStream();
+    streamUpdated();
     console.log('stopped ffmpeg');
     console.log(stdout, stderr)
   });
-
-  streamUpdated();
 });
 
 app.get('/api/ip', (req, res) => {

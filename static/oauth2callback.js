@@ -61,32 +61,6 @@ function createBookmark() {
     }
 }
 
-function checkValidToken() {
-    // Validate token, print error if not valid
-    if (!params.error) {
-        thereIsAnError(null);
-        fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' + params.access_token)
-        .then(res => res.json())
-        .then(data => {
-            if (data.error) {
-                thereIsAnError(data.error);
-            }
-
-            // if their token has expired, and they need to sign-in again
-            if (data.error === 'invalid_token') {
-                if (location.href.includes('localhost')) {
-                    window.location.href = '/';
-                } else {
-                    window.location.href = '/bad-token.html';
-                }
-            }
-        })
-        .catch(err => thereIsAnError(err));
-    } else {
-        thereIsAnError(params.error);
-    }
-}
-
 function setStreaming(isStreaming) {
     if (isStreaming) {
         document.getElementById('startBtn').className = 'changedButton';
@@ -201,10 +175,14 @@ fetch('../api/ip').then(res => res.json()).then(data => {
  * Socket stuff *
  ****************/
 socket.on('is authenticated', data => {
-    console.log(data);
     if (!data.authenticated) {
         window.location.href = '/';
     }
+});
+
+socket.on('update progress', data => {
+    uploadVidName.innerHTML = data.title;
+    uploadProgress.innerHTML = data.progress;
 });
 
 socket.on('update state', data => {
