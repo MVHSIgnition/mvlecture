@@ -1,13 +1,11 @@
 let bookmarksManager = new BookmarksManager();
 
-if (!window.location.hash) { // if people go to this page without first signing into Google
+/*if (!window.location.search) { // if people go to this page without first signing into Google
     window.location.href = '/';
-}
+}*/
 
 var socket = io();
 // Get url hash contents
-var json_str_escaped = window.location.hash.slice(1);
-var params = JSON.parse('{"' + decodeURI(json_str_escaped).replace(/"/g, '\\"').replace(/&/g, '","').replace(/=/g,'":"') + '"}');
 var isStreaming;
 let stream = null;
 
@@ -112,7 +110,6 @@ function setStreaming(isStreaming) {
 }
 
 function startEndStream() {
-    checkValidToken();
     document.getElementById('startBtn').disabled = true;
 
     if (!isStreaming) {
@@ -139,7 +136,6 @@ function startEndStream() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                oauthToken: params.access_token,
                 title,
                 playlistId: playlistSelect.value
             })
@@ -159,12 +155,6 @@ function startEndStream() {
             // Stop the stream
             fetch('../api/stop-streaming', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    oauthToken: params.access_token
-                })
             }).then(res => res.json()).then(data => {
                 if (!data.success) {
                     thereIsAnError(data.error);
@@ -199,8 +189,7 @@ function loadPlaylists() {
 /************************
  * Initialization stuff *
  ************************/
-checkValidToken();
-loadPlaylists();
+//loadPlaylists();
 
 fetch('../api/ip').then(res => res.json()).then(data => {
     let { ip } = data;
@@ -211,6 +200,13 @@ fetch('../api/ip').then(res => res.json()).then(data => {
 /****************
  * Socket stuff *
  ****************/
+socket.on('is authenticated', data => {
+    console.log(data);
+    if (!data.authenticated) {
+        window.location.href = '/';
+    }
+});
+
 socket.on('update state', data => {
     stream = data.stream;
 

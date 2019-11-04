@@ -1,3 +1,4 @@
+// Imports
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
@@ -5,13 +6,16 @@ const fetch = require('node-fetch');
 const fs = require('fs');
 const { exec } = require('child_process');
 const { generateDescription, indexOfMultiple } = require('./helpers.js');
-
+const { google } = require('googleapis');
 const FileCleaner = require('cron-file-cleaner').FileCleaner;
 const io = require('socket.io')(http);
+const url = require('url');
 
+// Serve static website files
 app.use(express.json());
 app.use(express.static(__dirname + '/static/'))
 
+// Folder that videos will be saved at
 const localVideoDirName = __dirname + '/videos/';
 
 // Create video folder if it doesn't exist
@@ -19,61 +23,86 @@ if (!fs.existsSync(localVideoDirName)) {
   fs.mkdirSync(localVideoDirName);
 }
 
-let stream = null;
-clearStream();
+//Initialize OAuth2
+const oauth2Client = new google.auth.OAuth2(
+  '946689392269-rd0qkinhi24uv8q7kf7pc981sd0vm9mf.apps.googleusercontent.com',
+  'hKUROQ8-0HMbGSVnF7sxW75u',
+  'http://localhost:1266/oauth2callback' //TODO: Make this NOT hardcoded
+);
 
-// Get the list of permissible webcams and mics
-const listDevicesCmd = 'ffmpeg -list_devices true -f dshow -i dummy';
+const authURL = oauth2Client.generateAuthUrl({
+  access_type: 'offline',
+  scope: ['https://www.googleapis.com/auth/youtube']
+});
+
+// Initialize Youtube API library
+const youtube = google.youtube({
+  version: 'v3',
+  auth: oauth2Client
+});
+
+// Initialize stream object
+let stream = null;
 var webcams = [];
 var mics = [];
+var gotToken = false;
+clearStream();
+getWebcamsMics();
 
-exec(listDevicesCmd, (error, stdout, stderr) => {
-  // Parse output for webcams and mics
-  const output = error.toString();
-  const videoDevicesIndex = output.indexOf('DirectShow video devices');
-  const audioDevicesIndex = output.indexOf('DirectShow audio devices');
+// Get the list of permissible webcams and mics
+function getWebcamsMics() {
+  const listDevicesCmd = 'ffmpeg -list_devices true -f dshow -i dummy';
+  webcams = [];
+  mics = [];
 
-  const indices = indexOfMultiple(output, '"', videoDevicesIndex);
+  exec(listDevicesCmd, (error, stdout, stderr) => {
+    // Parse output for webcams and mics
+    const output = error.toString();
+    const videoDevicesIndex = output.indexOf('DirectShow video devices');
+    const audioDevicesIndex = output.indexOf('DirectShow audio devices');
 
-  for (let i = 0; i < indices.length; i++) {
-    if (i+1 < indices.length) {
-      const device = output.substring(indices[i]+1, indices[i+1]);
-      if (indices[i] < audioDevicesIndex && indices[i+1] < audioDevicesIndex) {
-        // These are video devices
-        webcams.push({
-          name: device,
-          resolution: null,
-          framerate: null,
-        });
-      } else {
-        // These are audio devices
-        mics.push(device);
+    const indices = indexOfMultiple(output, '"', videoDevicesIndex);
+
+    for (let i = 0; i < indices.length; i++) {
+      if (i+1 < indices.length) {
+        const device = output.substring(indices[i]+1, indices[i+1]);
+        if (indices[i] < audioDevicesIndex && indices[i+1] < audioDevicesIndex) {
+          // These are video devices
+          webcams.push({
+            name: device,
+            resolution: null,
+            framerate: null,
+          });
+        } else {
+          // These are audio devices
+          mics.push(device);
+        }
+        // Skip the "Alternative name"
+        i += 3;
       }
-      // Skip the "Alternative name"
-      i += 3;
     }
-  }
 
-  io.emit('update mics', { mics });  
+    io.emit('update mics', { mics });  
 
-  for (let i = 0; i < webcams.length; i++) {
-    const listOptionsCmd = `ffmpeg -list_options true -f dshow -i video="${webcams[i].name}"`;
-    exec(listOptionsCmd, (error, stdout, stderr) => {
-      const output = error.toString();
-      const deviceOptionsIndex = output.indexOf('DirectShow video device options');
+    for (let i = 0; i < webcams.length; i++) {
+      const listOptionsCmd = `ffmpeg -list_options true -f dshow -i video="${webcams[i].name}"`;
+      exec(listOptionsCmd, (error, stdout, stderr) => {
+        const output = error.toString();
+        const deviceOptionsIndex = output.indexOf('DirectShow video device options');
 
-      const resIndex = output.indexOf(' s=', deviceOptionsIndex);
-      const resolution = output.substring(resIndex+3, output.indexOf(' ', resIndex+1));
-      const fpsIndex = output.indexOf('fps=', resIndex);
-      const framerate = output.substring(fpsIndex+4, output.indexOf(' ', fpsIndex));
-      
-      webcams[i].resolution = resolution;
-      webcams[i].framerate = framerate;
+        const resIndex = output.indexOf(' s=', deviceOptionsIndex);
+        const resolution = output.substring(resIndex+3, output.indexOf(' ', resIndex+1));
+        const fpsIndex = output.indexOf('fps=', resIndex);
+        const framerate = output.substring(fpsIndex+4, output.indexOf(' ', fpsIndex));
+        
+        webcams[i].resolution = resolution;
+        webcams[i].framerate = framerate;
 
-      io.emit('update webcams', { webcams });  
-    });
-  }
-});
+        io.emit('update webcams', { webcams });  
+      });
+    }
+  });
+}
 
 function getLanIpAddress() {
   let os = require('os');
@@ -154,6 +183,38 @@ function addVideoToPlaylist(videoId, playlistId, oauthToken) {
   }).then(res => res.json());
 }
 
+async function uploadVideo() {
+  const fileSize = fs.statSync(stream.localVideoFilename).size;
+  const res = await youtube.videos.insert(
+  {
+    part: 'id,snippet,status',
+    notifySubscribers: true,
+    requestBody: {
+      snippet: {
+        title: stream.title,
+        description: generateDescription(stream.bookmarks),
+      },
+      status: {
+        privacyStatus: 'public',
+      } 
+    },
+    media: {
+      body: fs.createReadStream(stream.localVideoFilename)
+    }
+  },
+  {
+    onUploadProgress: evt => {
+      const progress = (evt.bytesRead / fileSize) * 100;
+      readline.clearLine(process.stdout, 0);
+      readline.cursorTo(process.stdout, 0, null);
+      process.stdout.write(`${Math.round(progress)}% complete`);
+    }
+  });
+
+  console.log('\n\n');
+  console.log(res.data);
+}
+
 function streamUpdated() {
   io.emit('update state', { stream });  
 }
@@ -161,6 +222,8 @@ function streamUpdated() {
 // socket.io
 io.on('connection', (socket) => {
   streamUpdated();
+  getWebcamsMics();
+  io.emit('is authenticated', { authenticated: gotToken });
   io.emit('update mics', { mics });  
   io.emit('update webcams', { webcams });  
 
@@ -193,6 +256,20 @@ io.on('connection', (socket) => {
     stream.uiState.bookmarkName = value;
     streamUpdated();
   });
+});
+
+app.get('/', (req, res) => {
+  return res.redirect(authURL);
+});
+
+// OAuth2 callback
+app.get('/oauth2callback', async (req, res) => {
+  const q = url.parse(req.url, true);
+  const { tokens } = await oauth2Client.getToken(q.query.code);
+  oauth2Client.setCredentials(tokens); 
+  gotToken = true;
+
+  return res.redirect('/oauth2callback.html');
 });
 
 // bookmarks api
@@ -261,14 +338,13 @@ app.post('/api/init-stream', async (req, res) => {
     return res.send({ success: false, error: 'already_streaming' });
   }
 
-  // get and validate data from frontend
+  // get and validate data from frontend  
   let {
-    oauthToken,
     title,
     playlistId
   } = req.body;
 
-  if (!title || !oauthToken) {
+  if (!title) {
     return res.send({
       success: false,
       error: 'missing_data'
@@ -277,85 +353,19 @@ app.post('/api/init-stream', async (req, res) => {
 
   stream.title = title;
 
-  // create livestream rtmpAddr 
-  const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer ' + oauthToken,
-  }
-
-  let data = await fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn', {
-    method: 'POST',
-    headers: headers,
-    body: JSON.stringify({
-      snippet: {
-        title
-      },
-      cdn: {
-        resolution: 'variable',
-        frameRate: 'variable',
-        ingestionType: 'rtmp'
-      }
-    })
-  });
-  data = await data.json();
-
-  if (data.error) {
-    return res.send({ success: false, error: data.error });
-  }
-
-  // set backend state with google-provided streaming values
-  stream.streamId = data.id;
-  stream.rtmpAddr = data.cdn.ingestionInfo.ingestionAddress + '/' + data.cdn.ingestionInfo.streamName;
-
-
-  // create livestream on youtube channel
-  stream.scheduledStartTime = new Date().toISOString();
-  data = await fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      snippet: {
-        scheduledStartTime: stream.scheduledStartTime,
-        title
-      },
-      status: {
-        privacyStatus: 'public'
-      },
-      contentDetails: {
-        recordFromStart: true,
-        enableAutoStart: true
-      }
-    }),
-  });
-  data = await data.json();
-
-  if (data.error) {
-    return res.send({ success: false, error: data.error });
-  }
-
-  stream.youtubeId = data.id;
-
-  // bind the youtube livestream with rtmpAddr
-  data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id=${stream.youtubeId}&part=id&streamId=${stream.streamId}`, {
-    method: 'POST',
-    headers
-  });
-  data = await data.json();
-  stream.startTime = Date.now();
-
   // add to playlist
-  if (playlistId)
-    await addVideoToPlaylist(stream.youtubeId, playlistId, oauthToken);
+  // TODO: Reimplement
+  //if (playlistId)
+  //  await addVideoToPlaylist(stream.youtubeId, playlistId, oauthToken);
 
 
   // spin-up ffmpeg to begin feeding video and audio the rtmp url
   const webcam = webcams[stream.uiState.webcam];
   const micName = mics[stream.uiState.mic];
 
-  const localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
+  stream.localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
-  const cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid];[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset veryfast ${localVideoFilename} -map [vid2] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
-  //const cmd = `ffmpeg -y -f dshow -video_size ${webcam1.resolution} -framerate ${webcam1.framerate} -i video="${webcam1.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+  const cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -preset veryfast ${stream.localVideoFilename}`;
 
   exec(cmd, (err, stdout, stderr) => {
     console.log('ffmpeg command run');
@@ -372,9 +382,6 @@ app.post('/api/init-stream', async (req, res) => {
     success: true
   });
 
-  // update initial description
-  await updateTitleAndDescription(stream.title, oauthToken);
-
   streamUpdated();
 });
 
@@ -387,29 +394,6 @@ app.post('/api/stop-streaming', async (req, res) => {
     })
   }
 
-  let { oauthToken } = req.body;
-
-  if (!oauthToken) {
-    return res.send({
-      success: false,
-      error: 'no_oauth_token'
-    })
-  }
-
-  // tell google that stream has stopped
-  let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id=${stream.youtubeId}&broadcastStatus=complete&part=id`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + oauthToken
-    }
-  });
-  data = await data.json();
-
-  await updateTitleAndDescription(stream.title, oauthToken);
-
-  console.log(data);
-
   clearStream();
   res.send({
     success: true
@@ -420,6 +404,7 @@ app.post('/api/stop-streaming', async (req, res) => {
       console.error(err);
     }
 
+    uploadVideo();
     console.log('stopped ffmpeg');
     console.log(stdout, stderr)
   });
@@ -436,10 +421,10 @@ app.get('/api/ip', (req, res) => {
 
 // Delete all files older than 24 hours
 const fileWatcher = new FileCleaner(localVideoDirName, 24*3600000, '* */15 * * * *', {
-  start: true,
-  blacklist: '/\.init/'
+  start: true
 });
 
+// Start server
 let port;
 let listener = http.listen(process.env.PORT || 1266, () => {
   port = listener.address().port;
