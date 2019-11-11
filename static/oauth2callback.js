@@ -142,28 +142,9 @@ function startEndStream() {
     }
 }
 
-function loadPlaylists() {
-    fetch('https://www.googleapis.com/youtube/v3/playlists?part=snippet&mine=true', {
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + params.access_token,
-        }
-    }).then(res => res.json()).then(res => {
-        let { items } = res;
-
-        for (let i = 0; i < items.length; i++) {
-            let opt = document.createElement('option');
-            opt.value = items[i].id;
-            opt.innerText = items[i].snippet.title;
-            playlistSelect.appendChild(opt);
-        }
-    });
-}
-
 /************************
  * Initialization stuff *
  ************************/
-//loadPlaylists();
 
 fetch('../api/ip').then(res => res.json()).then(data => {
     let { ip } = data;
@@ -210,7 +191,7 @@ socket.on('update state', data => {
 });
 
 socket.on('update mics', data => {
-    const mics = data.mics;
+    const { mics } = data;
     micSelect.length = 0;
     for (let i = 0; i < mics.length; i++) {
         let opt = document.createElement('option');
@@ -221,13 +202,25 @@ socket.on('update mics', data => {
 });
 
 socket.on('update webcams', data => {
-    const webcams = data.webcams;
+    const { webcams } = data;
     webcamSelect.length = 0;
     for (let i = 0; i < webcams.length; i++) {
         let opt = document.createElement('option');
         opt.value = i;
         opt.innerText = webcams[i].name;
         webcamSelect.appendChild(opt);
+    }
+});
+
+socket.on('update playlists', data => {
+    const { playlists } = data;
+    playlistSelect.length = 0;
+    playlistSelect.innerHTML = '<option value="">None</option>';
+    for (let i = 0; i < playlists.length; i++) {
+        let opt = document.createElement('option');
+        opt.value = playlists[i].id;
+        opt.innerText = playlists[i].title;
+        playlistSelect.appendChild(opt);
     }
 });
 

@@ -46,6 +46,7 @@ const youtube = google.youtube({
 let stream = null;
 var webcams = [];
 var mics = [];
+var playlists = [];
 var gotToken = false;
 clearStream();
 getWebcamsMics();
@@ -138,42 +139,34 @@ function clearStream() {
     youtubeId: null,
     rtmpAddr: null,
     startTime: null,
+    playlistId: null,
   }
 }
 
-function updateTitleAndDescription(title, oauthToken) {
-  return fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet', {
-    method: 'PUT',
-    headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + oauthToken,
-    },
-    body: JSON.stringify({
-      id: stream.youtubeId,
-      snippet: {
-        title,
-        description: generateDescription(stream.bookmarks),
-        scheduledStartTime: stream.scheduledStartTime,
-      }
-    })
-  }).then(res => res.json()).then(data => {
-    if (!data.error) {
-      stream.title = title;
-    }
-
-    return data;
+async function getPlaylists() {
+  const res = await youtube.playlists.list({
+    part: 'snippet',
+    mine: true
   });
+
+  let { items } = res.data;
+  playlists = [];
+  for (let i = 0; i < items.length; i++) {
+    playlists.push({
+      id: items[i].id, 
+      title: items[i].snippet.title
+    });
+  }
+
+  io.emit('update playlists', { playlists });
 }
 
 // TODO: Fix playlists
-function addVideoToPlaylist(videoId, playlistId, oauthToken) {
-  return fetch('https://www.googleapis.com/youtube/v3/playlistItems?part=snippet', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + oauthToken
-    },
-    body: JSON.stringify({
+async function addVideoToPlaylist(videoId, playlistId) {
+  console.log(`videoId: ${videoId}, playlistId: ${playlistId}`);
+  const res = await youtube.playlistItems.insert({
+    part: 'snippet',
+    requestBody: {
       snippet: {
         playlistId,
         resourceId: {
@@ -181,20 +174,25 @@ function addVideoToPlaylist(videoId, playlistId, oauthToken) {
           videoId
         }
       }
-    })
-  }).then(res => res.json());
+    }
+  });
+
+  console.log('Added to playlist!');
+  console.log(res.data);
 }
 
 async function uploadVideo(stream) {
-  const fileSize = fs.statSync(stream.localVideoFilename).size;
+  const { localVideoFilename, bookmarks, title, playlistId } = stream;
+
+  const fileSize = fs.statSync(localVideoFilename).size;
   const res = await youtube.videos.insert(
   {
     part: 'id,snippet,status',
     notifySubscribers: true,
     requestBody: {
       snippet: {
-        title: stream.title,
-        description: generateDescription(stream.bookmarks),
+        title: title,
+        description: generateDescription(bookmarks),
         categoryId: 27,
       },
       status: {
@@ -202,7 +200,7 @@ async function uploadVideo(stream) {
       } 
     },
     media: {
-      body: fs.createReadStream(stream.localVideoFilename)
+      body: fs.createReadStream(localVideoFilename)
     }
   },
   {
@@ -212,13 +210,18 @@ async function uploadVideo(stream) {
       readline.clearLine(process.stdout, 0);
       readline.cursorTo(process.stdout, 0, null);
       process.stdout.write(`${Math.round(progress)}% complete`);
-      io.emit('update progress', { title: stream.title, progress: Math.round(progress) });
+      io.emit('update progress', { title: title, progress: Math.round(progress) });
     }
   }).catch(error => {
     // TODO: Handle if token not set
     console.log('THERE WAS AN ERROR');
     console.log(error);
   });
+
+  if (playlistId) {
+    console.log('adding to playlist...');
+    addVideoToPlaylist(res.data.id, playlistId);
+  }
 
   console.log('\n\n');
   console.log(res.data);
@@ -230,41 +233,45 @@ function streamUpdated() {
 
 // socket.io
 io.on('connection', (socket) => {
-  streamUpdated();
-  getWebcamsMics();
   io.emit('is authenticated', { authenticated: gotToken });
-  io.emit('update mics', { mics });  
-  io.emit('update webcams', { webcams });  
-
-  socket.on('title changed', title => {
-    stream.uiState.title = title;
+  if (gotToken) {
+    getPlaylists();
     streamUpdated();
-  });
+    getWebcamsMics();
+    io.emit('update mics', { mics });  
+    io.emit('update webcams', { webcams });  
+    io.emit('update playlists', { playlists });
 
-  socket.on('date checkbox changed', checked => {
-    stream.uiState.addDate = checked;
-    streamUpdated();
-  });
+    socket.on('title changed', title => {
+      stream.uiState.title = title;
+      streamUpdated();
+    });
 
-  socket.on('playlist select changed', index => {
-    stream.uiState.playlist = index;
-    streamUpdated();
-  });
+    socket.on('date checkbox changed', checked => {
+      stream.uiState.addDate = checked;
+      streamUpdated();
+    });
 
-  socket.on('webcam select changed', index => {
-    stream.uiState.webcam = index;
-    streamUpdated();
-  });
+    socket.on('playlist select changed', index => {
+      stream.uiState.playlist = index;
+      streamUpdated();
+    });
 
-  socket.on('mic select changed', index => {
-    stream.uiState.mic = index;
-    streamUpdated();
-  });
+    socket.on('webcam select changed', index => {
+      stream.uiState.webcam = index;
+      streamUpdated();
+    });
 
-  socket.on('bookmark name changed', value => {
-    stream.uiState.bookmarkName = value;
-    streamUpdated();
-  });
+    socket.on('mic select changed', index => {
+      stream.uiState.mic = index;
+      streamUpdated();
+    });
+
+    socket.on('bookmark name changed', value => {
+      stream.uiState.bookmarkName = value;
+      streamUpdated();
+    });
+  }
 });
 
 app.get('/', (req, res) => {
@@ -361,14 +368,9 @@ app.post('/api/init-stream', async (req, res) => {
   }
 
   stream.title = title;
+  stream.playlistId = playlistId;
 
-  // add to playlist
-  // TODO: Reimplement
-  //if (playlistId)
-  //  await addVideoToPlaylist(stream.youtubeId, playlistId, oauthToken);
-
-
-  // spin-up ffmpeg to begin feeding video and audio the rtmp url
+  // Start recording video with ffmpeg
   const webcam = webcams[stream.uiState.webcam];
   const micName = mics[stream.uiState.mic];
 
