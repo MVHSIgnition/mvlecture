@@ -161,7 +161,6 @@ async function getPlaylists() {
   io.emit('update playlists', { playlists });
 }
 
-// TODO: Fix playlists
 async function addVideoToPlaylist(videoId, playlistId) {
   console.log(`videoId: ${videoId}, playlistId: ${playlistId}`);
   const res = await youtube.playlistItems.insert({
@@ -179,6 +178,33 @@ async function addVideoToPlaylist(videoId, playlistId) {
 
   console.log('Added to playlist!');
   console.log(res.data);
+}
+
+async function updateTitleAndDescription(title) {
+  console.log('update title and description');
+  console.log(stream.youtubeId);
+  console.log(stream.scheduledStartTime);
+  /*const res = await youtube.liveBroadcasts.update({
+    part: 'id,snippet',
+    Id: stream.youtubeId,
+    responseBody: {
+      snippet: {
+        title,
+        description: generateDescription(stream.bookmarks),
+        scheduledStartTime: stream.scheduledStartTime,
+      }
+    }
+  });
+
+  console.log('RESSS: ', res);
+
+  if (!res.data.error) {
+    stream.title = title;
+  }
+
+  return res.data;
+  */
+ console.log('rip');
 }
 
 async function uploadVideo(stream) {
@@ -313,7 +339,7 @@ app.post('/api/set-bookmarks', async (req, res) => {
   stream.uiState.bookmarkName = '';
   streamUpdated();
 
-  await updateTitleAndDescription(stream.title, req.body.oauthToken);
+  await updateTitleAndDescription(stream.title);
 });
 
 app.post('/api/update-stream', async (req, res) => {
@@ -334,7 +360,7 @@ app.post('/api/update-stream', async (req, res) => {
     })
   }
 
-  let data = await updateTitleAndDescription(req.body.title, oauthToken);
+  let data = await updateTitleAndDescription(req.body.title);
 
   if (data.error) {
     return res.send({
@@ -369,14 +395,90 @@ app.post('/api/init-stream', async (req, res) => {
 
   stream.title = title;
   stream.playlistId = playlistId;
+  
+  //
+  // Create new livestream
+  //
+  let data;
+  console.log('Creating livestream...');
+  ({ data } = await youtube.liveStreams.insert({
+    part: 'snippet,cdn',
+    requestBody: {
+      snippet: {	
+        title	
+      },	
+      cdn: {	
+        resolution: 'variable',	
+        frameRate: 'variable',	
+        ingestionType: 'rtmp'	
+      }	
+    }
+  }));
 
-  // Start recording video with ffmpeg
+  if (data.error) {	
+    return res.send({ success: false, error: data.error });	
+  }	
+
+  // Set backend state with google-provided streaming values	
+  stream.streamId = data.id;	
+  stream.rtmpAddr = data.cdn.ingestionInfo.ingestionAddress + '/' + data.cdn.ingestionInfo.streamName;	
+
+  //
+  // Create new livebroadcast
+  //
+  console.log('Creating livebroadcast...');
+  stream.scheduledStartTime = new Date().toISOString();	
+  ({ data } = await youtube.liveBroadcasts.insert({
+    part: 'snippet,status,contentDetails',
+    requestBody: {
+      snippet: {	
+        scheduledStartTime: stream.scheduledStartTime,	
+        title	
+      },	
+      status: {	
+        privacyStatus: 'public'	
+      },	
+      contentDetails: {	
+        recordFromStart: true,	// MAYBE THESE ARE CAUSING THE ERRORS WE HAVE?!??
+        enableAutoStart: true	
+      }	
+    }
+  }));
+
+  if (data.error) {	
+    return res.send({ success: false, error: data.error });	
+  }
+
+  stream.youtubeId = data.id;	
+
+  //
+  // Bind livestream to livebroadcast
+  //
+  console.log(`Binding livebroadcast...`);
+  ({ data } = await youtube.liveBroadcasts.bind({
+    id: stream.youtubeId,
+    part: 'id',
+    streamId: stream.streamId
+  }));
+
+  if (data.error) {	
+    return res.send({ success: false, error: data.error });	
+  }
+
+  stream.startTime = Date.now();
+
+  // Add video to playlist, if specified
+  if (playlistId) {
+    await addVideoToPlaylist(stream.youtubeId, playlistId);
+  }
+
+  // Start streaming video with ffmpeg
   const webcam = webcams[stream.uiState.webcam];
   const micName = mics[stream.uiState.mic];
 
   stream.localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
-  const cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g ${webcam.framerate*2} -c:a aac -b:a 128k -ar 44100 ${stream.localVideoFilename}`;
+  const cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid];[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g ${webcam.framerate*2} -c:a aac -b:a 128k -ar 44100 -f flv ${stream.rtmpAddr} -map [vid2] -map 0:a -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g ${webcam.framerate*2} -c:a aac -b:a 128k -ar 44100 ${stream.localVideoFilename}`;
 
   exec(cmd, (err, stdout, stderr) => {
     console.log('ffmpeg command run');
@@ -392,6 +494,10 @@ app.post('/api/init-stream', async (req, res) => {
   res.send({
     success: true
   });
+
+  // update initial description	
+  await updateTitleAndDescription(stream.title);
+  console.log('done');
 
   streamUpdated();
 });
