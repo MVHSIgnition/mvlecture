@@ -91,13 +91,15 @@ function getWebcamsMics() {
         const output = error.toString();
         const deviceOptionsIndex = output.indexOf('DirectShow video device options');
 
-        const resIndex = output.indexOf(' s=', deviceOptionsIndex);
-        const resolution = output.substring(resIndex+3, output.indexOf(' ', resIndex+1));
+        const vcodecIndex = output.indexOf('vcodec=mjpeg', deviceOptionsIndex);
+        const resIndex = output.indexOf('max s=', vcodecIndex);
+        const resolution = output.substring(resIndex+6, output.indexOf(' ', resIndex+6)); 
         const fpsIndex = output.indexOf('fps=', resIndex);
-        const framerate = output.substring(fpsIndex+4, output.indexOf(' ', fpsIndex));
+        const framerate = output.substring(fpsIndex+4, output.indexOf('[', fpsIndex)-1); // indexof \r or \n
+        //console.log("FRAMERATE!: " + framerate);
         
         webcams[i].resolution = resolution;
-        webcams[i].framerate = framerate;
+        webcams[i].framerate = framerate;               
 
         io.emit('update webcams', { webcams });  
       });
