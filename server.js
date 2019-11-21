@@ -46,6 +46,7 @@ const youtube = google.youtube({
 let stream = null;
 var webcams = [];
 var mics = [];
+var playlists = [];
 var gotToken = false;
 clearStream();
 getWebcamsMics();
@@ -140,42 +141,33 @@ function clearStream() {
     youtubeId: null,
     rtmpAddr: null,
     startTime: null,
+    playlistId: null,
   }
 }
 
-function updateTitleAndDescription(title, oauthToken) {
-  return fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet', {
-    method: 'PUT',
-    headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + oauthToken,
-    },
-    body: JSON.stringify({
-      id: stream.youtubeId,
-      snippet: {
-        title,
-        description: generateDescription(stream.bookmarks),
-        scheduledStartTime: stream.scheduledStartTime,
-      }
-    })
-  }).then(res => res.json()).then(data => {
-    if (!data.error) {
-      stream.title = title;
-    }
-
-    return data;
+async function getPlaylists() {
+  const res = await youtube.playlists.list({
+    part: 'snippet',
+    mine: true
   });
+
+  let { items } = res.data;
+  playlists = [];
+  for (let i = 0; i < items.length; i++) {
+    playlists.push({
+      id: items[i].id, 
+      title: items[i].snippet.title
+    });
+  }
+
+  io.emit('update playlists', { playlists });
 }
 
-// TODO: Fix playlists
-function addVideoToPlaylist(videoId, playlistId, oauthToken) {
-  return fetch('https://www.googleapis.com/youtube/v3/playlistItems?part=snippet', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + oauthToken
-    },
-    body: JSON.stringify({
+async function addVideoToPlaylist(videoId, playlistId) {
+  console.log(`videoId: ${videoId}, playlistId: ${playlistId}`);
+  const res = await youtube.playlistItems.insert({
+    part: 'snippet',
+    requestBody: {
       snippet: {
         playlistId,
         resourceId: {
@@ -183,20 +175,52 @@ function addVideoToPlaylist(videoId, playlistId, oauthToken) {
           videoId
         }
       }
-    })
-  }).then(res => res.json());
+    }
+  });
+
+  console.log('Added to playlist!');
+  console.log(res.data);
+}
+
+async function updateTitleAndDescription(title) {
+  console.log('update title and description');
+  console.log(stream.youtubeId);
+  console.log(stream.scheduledStartTime);
+  /*const res = await youtube.liveBroadcasts.update({
+    part: 'id,snippet',
+    Id: stream.youtubeId,
+    responseBody: {
+      snippet: {
+        title,
+        description: generateDescription(stream.bookmarks),
+        scheduledStartTime: stream.scheduledStartTime,
+      }
+    }
+  });
+
+  console.log('RESSS: ', res);
+
+  if (!res.data.error) {
+    stream.title = title;
+  }
+
+  return res.data;
+  */
+ console.log('rip');
 }
 
 async function uploadVideo(stream) {
-  const fileSize = fs.statSync(stream.localVideoFilename).size;
+  const { localVideoFilename, bookmarks, title, playlistId } = stream;
+
+  const fileSize = fs.statSync(localVideoFilename).size;
   const res = await youtube.videos.insert(
   {
     part: 'id,snippet,status',
     notifySubscribers: true,
     requestBody: {
       snippet: {
-        title: stream.title,
-        description: generateDescription(stream.bookmarks),
+        title: title,
+        description: generateDescription(bookmarks),
         categoryId: 27,
       },
       status: {
@@ -204,7 +228,7 @@ async function uploadVideo(stream) {
       } 
     },
     media: {
-      body: fs.createReadStream(stream.localVideoFilename)
+      body: fs.createReadStream(localVideoFilename)
     }
   },
   {
@@ -214,13 +238,18 @@ async function uploadVideo(stream) {
       readline.clearLine(process.stdout, 0);
       readline.cursorTo(process.stdout, 0, null);
       process.stdout.write(`${Math.round(progress)}% complete`);
-      io.emit('update progress', { title: stream.title, progress: Math.round(progress) });
+      io.emit('update progress', { title: title, progress: Math.round(progress) });
     }
   }).catch(error => {
     // TODO: Handle if token not set
     console.log('THERE WAS AN ERROR');
     console.log(error);
   });
+
+  if (playlistId) {
+    console.log('adding to playlist...');
+    addVideoToPlaylist(res.data.id, playlistId);
+  }
 
   console.log('\n\n');
   console.log(res.data);
@@ -232,41 +261,45 @@ function streamUpdated() {
 
 // socket.io
 io.on('connection', (socket) => {
-  streamUpdated();
-  getWebcamsMics();
   io.emit('is authenticated', { authenticated: gotToken });
-  io.emit('update mics', { mics });  
-  io.emit('update webcams', { webcams });  
-
-  socket.on('title changed', title => {
-    stream.uiState.title = title;
+  if (gotToken) {
+    getPlaylists();
     streamUpdated();
-  });
+    getWebcamsMics();
+    io.emit('update mics', { mics });  
+    io.emit('update webcams', { webcams });  
+    io.emit('update playlists', { playlists });
 
-  socket.on('date checkbox changed', checked => {
-    stream.uiState.addDate = checked;
-    streamUpdated();
-  });
+    socket.on('title changed', title => {
+      stream.uiState.title = title;
+      streamUpdated();
+    });
 
-  socket.on('playlist select changed', index => {
-    stream.uiState.playlist = index;
-    streamUpdated();
-  });
+    socket.on('date checkbox changed', checked => {
+      stream.uiState.addDate = checked;
+      streamUpdated();
+    });
 
-  socket.on('webcam select changed', index => {
-    stream.uiState.webcam = index;
-    streamUpdated();
-  });
+    socket.on('playlist select changed', index => {
+      stream.uiState.playlist = index;
+      streamUpdated();
+    });
 
-  socket.on('mic select changed', index => {
-    stream.uiState.mic = index;
-    streamUpdated();
-  });
+    socket.on('webcam select changed', index => {
+      stream.uiState.webcam = index;
+      streamUpdated();
+    });
 
-  socket.on('bookmark name changed', value => {
-    stream.uiState.bookmarkName = value;
-    streamUpdated();
-  });
+    socket.on('mic select changed', index => {
+      stream.uiState.mic = index;
+      streamUpdated();
+    });
+
+    socket.on('bookmark name changed', value => {
+      stream.uiState.bookmarkName = value;
+      streamUpdated();
+    });
+  }
 });
 
 app.get('/', (req, res) => {
@@ -308,7 +341,7 @@ app.post('/api/set-bookmarks', async (req, res) => {
   stream.uiState.bookmarkName = '';
   streamUpdated();
 
-  await updateTitleAndDescription(stream.title, req.body.oauthToken);
+  await updateTitleAndDescription(stream.title);
 });
 
 app.post('/api/update-stream', async (req, res) => {
@@ -329,7 +362,7 @@ app.post('/api/update-stream', async (req, res) => {
     })
   }
 
-  let data = await updateTitleAndDescription(req.body.title, oauthToken);
+  let data = await updateTitleAndDescription(req.body.title);
 
   if (data.error) {
     return res.send({
@@ -363,20 +396,91 @@ app.post('/api/init-stream', async (req, res) => {
   }
 
   stream.title = title;
+  stream.playlistId = playlistId;
+  
+  //
+  // Create new livestream
+  //
+  let data;
+  console.log('Creating livestream...');
+  ({ data } = await youtube.liveStreams.insert({
+    part: 'snippet,cdn',
+    requestBody: {
+      snippet: {	
+        title	
+      },	
+      cdn: {	
+        resolution: 'variable',	
+        frameRate: 'variable',	
+        ingestionType: 'rtmp'	
+      }	
+    }
+  }));
 
-  // add to playlist
-  // TODO: Reimplement
-  //if (playlistId)
-  //  await addVideoToPlaylist(stream.youtubeId, playlistId, oauthToken);
+  if (data.error) {	
+    return res.send({ success: false, error: data.error });	
+  }	
 
+  // Set backend state with google-provided streaming values	
+  stream.streamId = data.id;	
+  stream.rtmpAddr = data.cdn.ingestionInfo.ingestionAddress + '/' + data.cdn.ingestionInfo.streamName;	
 
-  // spin-up ffmpeg to begin feeding video and audio the rtmp url
+  //
+  // Create new livebroadcast
+  //
+  console.log('Creating livebroadcast...');
+  stream.scheduledStartTime = new Date().toISOString();	
+  ({ data } = await youtube.liveBroadcasts.insert({
+    part: 'snippet,status,contentDetails',
+    requestBody: {
+      snippet: {	
+        scheduledStartTime: stream.scheduledStartTime,	
+        title	
+      },	
+      status: {	
+        privacyStatus: 'public'	
+      },	
+      contentDetails: {	
+        recordFromStart: true,	// MAYBE THESE ARE CAUSING THE ERRORS WE HAVE?!??
+        enableAutoStart: true	
+      }	
+    }
+  }));
+
+  if (data.error) {	
+    return res.send({ success: false, error: data.error });	
+  }
+
+  stream.youtubeId = data.id;	
+
+  //
+  // Bind livestream to livebroadcast
+  //
+  console.log(`Binding livebroadcast...`);
+  ({ data } = await youtube.liveBroadcasts.bind({
+    id: stream.youtubeId,
+    part: 'id',
+    streamId: stream.streamId
+  }));
+
+  if (data.error) {	
+    return res.send({ success: false, error: data.error });	
+  }
+
+  stream.startTime = Date.now();
+
+  // Add video to playlist, if specified
+  if (playlistId) {
+    await addVideoToPlaylist(stream.youtubeId, playlistId);
+  }
+
+  // Start streaming video with ffmpeg
   const webcam = webcams[stream.uiState.webcam];
   const micName = mics[stream.uiState.mic];
 
   stream.localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
-  const cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g ${webcam.framerate*2} -c:a aac -b:a 128k -ar 44100 ${stream.localVideoFilename}`;
+  const cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid];[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g ${webcam.framerate*2} -c:a aac -b:a 128k -ar 44100 -f flv ${stream.rtmpAddr} -map [vid2] -map 0:a -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g ${webcam.framerate*2} -c:a aac -b:a 128k -ar 44100 ${stream.localVideoFilename}`;
 
   exec(cmd, (err, stdout, stderr) => {
     console.log('ffmpeg command run');
@@ -392,6 +496,10 @@ app.post('/api/init-stream', async (req, res) => {
   res.send({
     success: true
   });
+
+  // update initial description	
+  await updateTitleAndDescription(stream.title);
+  console.log('done');
 
   streamUpdated();
 });
