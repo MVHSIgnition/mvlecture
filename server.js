@@ -3,8 +3,14 @@ const app = express();
 const http = require('http').createServer(app);
 const fetch = require('node-fetch');
 const fs = require('fs');
-const { exec } = require('child_process');
-const { generateDescription, indexOfMultiple } = require('./helpers.js');
+const {
+  generateDescription,
+  getLanIpAddress,
+  updateTitleAndDescription,
+  addVideoToPlaylist,
+  execp
+} = require('./lib/helpers.js');
+const parseDevices = require('./lib/parseDevices.js');
 
 const FileCleaner = require('cron-file-cleaner').FileCleaner;
 const io = require('socket.io')(http);
@@ -21,72 +27,6 @@ if (!fs.existsSync(localVideoDirName)) {
 
 let stream = null;
 clearStream();
-
-// Get the list of permissible webcams and mics
-const listDevicesCmd = 'ffmpeg -list_devices true -f dshow -i dummy';
-var webcams = [];
-var mics = [];
-
-exec(listDevicesCmd, (error, stdout, stderr) => {
-  // Parse output for webcams and mics
-  const output = error.toString();
-  const videoDevicesIndex = output.indexOf('DirectShow video devices');
-  const audioDevicesIndex = output.indexOf('DirectShow audio devices');
-
-  const indices = indexOfMultiple(output, '"', videoDevicesIndex);
-
-  for (let i = 0; i < indices.length; i++) {
-    if (i+1 < indices.length) {
-      const device = output.substring(indices[i]+1, indices[i+1]);
-      if (indices[i] < audioDevicesIndex && indices[i+1] < audioDevicesIndex) {
-        // These are video devices
-        webcams.push({
-          name: device,
-          resolution: null,
-          framerate: null,
-        });
-      } else {
-        // These are audio devices
-        mics.push(device);
-      }
-      // Skip the "Alternative name"
-      i += 3;
-    }
-  }
-
-  io.emit('update mics', { mics });  
-
-  for (let i = 0; i < webcams.length; i++) {
-    const listOptionsCmd = `ffmpeg -list_options true -f dshow -i video="${webcams[i].name}"`;
-    exec(listOptionsCmd, (error, stdout, stderr) => {
-      const output = error.toString();
-      const deviceOptionsIndex = output.indexOf('DirectShow video device options');
-
-      const resIndex = output.indexOf(' s=', deviceOptionsIndex);
-      const resolution = output.substring(resIndex+3, output.indexOf(' ', resIndex+1));
-      const fpsIndex = output.indexOf('fps=', resIndex);
-      const framerate = output.substring(fpsIndex+4, output.indexOf(' ', fpsIndex));
-      
-      webcams[i].resolution = resolution;
-      webcams[i].framerate = framerate;
-
-      io.emit('update webcams', { webcams });  
-    });
-  }
-});
-
-function getLanIpAddress() {
-  let os = require('os');
-  let ifaces = os.networkInterfaces();
-
-  for (let each in ifaces) {
-    for (let a of ifaces[each]) {
-      if (a.family === 'IPv4' && !a.internal) {
-        return a.address;
-      }
-    }
-  }
-}
 
 function clearStream() {
   stream = {
@@ -111,48 +51,13 @@ function clearStream() {
   }
 }
 
-function updateTitleAndDescription(title, oauthToken) {
-  return fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=id,snippet', {
-    method: 'PUT',
-    headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + oauthToken,
-    },
-    body: JSON.stringify({
-      id: stream.youtubeId,
-      snippet: {
-        title,
-        description: generateDescription(stream.bookmarks),
-        scheduledStartTime: stream.scheduledStartTime,
-      }
-    })
-  }).then(res => res.json()).then(data => {
-    if (!data.error) {
-      stream.title = title;
-    }
-
-    return data;
-  });
-}
-
-function addVideoToPlaylist(videoId, playlistId, oauthToken) {
-  return fetch('https://www.googleapis.com/youtube/v3/playlistItems?part=snippet', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + oauthToken
-    },
-    body: JSON.stringify({
-      snippet: {
-        playlistId,
-        resourceId: {
-          kind: 'youtube#video',
-          videoId
-        }
-      }
-    })
-  }).then(res => res.json());
-}
+let webcams, mics;
+parseDevices().then(({ webcams: w, mics: m }) => {
+  webcams = w;
+  mics = m;
+  io.emit('update mics', { mics });
+  io.emit('update webcams', { webcams });
+});
 
 function streamUpdated() {
   io.emit('update state', { stream });  
@@ -161,8 +66,9 @@ function streamUpdated() {
 // socket.io
 io.on('connection', (socket) => {
   streamUpdated();
-  io.emit('update mics', { mics });  
-  io.emit('update webcams', { webcams });  
+  io.emit('update mics', { mics });
+  console.log('mics', mics);
+  io.emit('update webcams', { webcams });
 
   socket.on('title changed', title => {
     stream.uiState.title = title;
@@ -357,7 +263,7 @@ app.post('/api/init-stream', async (req, res) => {
   const cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid];[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset veryfast ${localVideoFilename} -map [vid2] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
   //const cmd = `ffmpeg -y -f dshow -video_size ${webcam1.resolution} -framerate ${webcam1.framerate} -i video="${webcam1.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
 
-  exec(cmd, (err, stdout, stderr) => {
+  execp(cmd).then(({err, stdout, stderr}) => {
     console.log('ffmpeg command run');
 
     if (err) {
@@ -410,18 +316,18 @@ app.post('/api/stop-streaming', async (req, res) => {
 
   console.log(data);
 
-  clearStream();
-  res.send({
-    success: true
-  });
-
-  exec('taskkill /im ffmpeg.exe /t /f', (err, stdout, stderr) => {
+  execp('taskkill /im ffmpeg.exe /t /f').then(({error, stdout, stderr}) => {
     if (err) {
       console.error(err);
     }
 
     console.log('stopped ffmpeg');
-    console.log(stdout, stderr)
+    console.log(stdout, stderr);
+  });
+
+  clearStream();
+  res.send({
+    success: true
   });
 
   streamUpdated();
