@@ -191,7 +191,7 @@ app.post('/api/init-stream', async (req, res) => {
     'Authorization': 'Bearer ' + oauthToken,
   }
 
-  log('Starting stream');
+  log('Starting stream', true);
 
   let data = await fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn', {
     method: 'POST',
@@ -270,14 +270,14 @@ app.post('/api/init-stream', async (req, res) => {
   //const cmd = `ffmpeg -y -f dshow -video_size ${webcam1.resolution} -framerate ${webcam1.framerate} -i video="${webcam1.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 3000k -bufsize 6000k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
 
   execp(cmd).then(({ err, stdout, stderr }) => {
-    log('ffmpeg command run', true);
+    log('ffmpeg started up', true);
 
     if (err) {
-      log(err, true);
+      log(err);
     }
 
-    log(stdout, true);
-    log(stderr, true);
+    log(stdout);
+    log(stderr);
   });
   
   stream.isStreaming = true;
@@ -323,25 +323,25 @@ app.post('/api/stop-streaming', async (req, res) => {
   // check to see how long the stream has been going on for
   let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet&id=${stream.youtubeId}`,
   {
-    heades: {
+    headers: {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer ' + oauthToken
     }
   });
   data = await data.json();
-  console.log(data);
   let actualStartTime = (new Date(data.items[0].snippet.actualStartTime)).getTime();
 
   stop();
 
   async function stop() {
     if (Date.now() - actualStartTime < streamDesiredLength) {
+      console.log('\n');
       printYellow('DO NOT close the terminal yet. Still uploading your video.');
       printYellow('Only uploaded ' + 100 * ((Date.now() - actualStartTime) / streamDesiredLength) + '% of video');
       return setTimeout(stop, 2000);
     }
 
-    log('Stopping stream');
+    log('Stopping stream', true);
 
     // tell google that stream has stopped
     let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id=${stream.youtubeId}&broadcastStatus=complete&part=id`, {
@@ -356,12 +356,12 @@ app.post('/api/stop-streaming', async (req, res) => {
     if (data.error)
       log(data.error);
 
-    execp('taskkill /im ffmpeg.exe /t /f').then(({ error, stdout, stderr }) => {
+    log('Stopping ffmpeg', true);
+    execp('taskkill /im ffmpeg.exe /t /f').then(({ err, stdout, stderr }) => {
       if (err) {
-        log(err, true);
+        log(err);
       }
 
-      log('stopped ffmpeg', true);
       log(stdout);
       log(stderr);
     });
