@@ -128,7 +128,7 @@ app.post('/api/set-bookmarks', async (req, res) => {
   stream.uiState.bookmarkName = '';
   streamUpdated();
 
-  await updateTitleAndDescription(stream.title, req.body.oauthToken);
+  await updateTitleAndDescription(stream, stream.title, req.body.oauthToken);
 });
 
 app.post('/api/update-stream', async (req, res) => {
@@ -149,7 +149,7 @@ app.post('/api/update-stream', async (req, res) => {
     })
   }
 
-  let data = await updateTitleAndDescription(req.body.title, oauthToken);
+  let data = await updateTitleAndDescription(stream, req.body.title, oauthToken);
 
   if (data.error) {
     return res.send({
@@ -286,7 +286,7 @@ app.post('/api/init-stream', async (req, res) => {
   });
 
   // update initial description
-  await updateTitleAndDescription(stream.title, oauthToken);
+  await updateTitleAndDescription(stream, stream.title, oauthToken);
 
   streamUpdated();
 });
@@ -311,7 +311,7 @@ app.post('/api/stop-streaming', async (req, res) => {
 
   let streamDesiredLength = Date.now() - stream.startTime;
 
-  await updateTitleAndDescription(stream.title, oauthToken);
+  await updateTitleAndDescription(stream, stream.title, oauthToken);
 
   res.send({
     success: true
