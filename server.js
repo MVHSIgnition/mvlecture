@@ -329,6 +329,7 @@ app.post('/api/stop-streaming', async (req, res) => {
     }
   });
   data = await data.json();
+  console.log(data);
   let actualStartTime = (new Date(data.items[0].snippet.actualStartTime)).getTime();
 
   stop();
