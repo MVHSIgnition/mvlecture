@@ -8,7 +8,9 @@ const {
   getLanIpAddress,
   updateTitleAndDescription,
   addVideoToPlaylist,
-  execp
+  execp,
+  log,
+  printYellow
 } = require('./lib/helpers.js');
 const parseDevices = require('./lib/parseDevices.js');
 
@@ -31,6 +33,7 @@ clearStream();
 function clearStream() {
   stream = {
     isStreaming: false,
+    startTime: null,
 
     // user provided values
     bookmarks: [],
@@ -47,7 +50,7 @@ function clearStream() {
     streamId: null,
     youtubeId: null,
     rtmpAddr: null,
-    startTime: null,
+    scheduledStartTime: null,
   }
 }
 
@@ -67,7 +70,6 @@ function streamUpdated() {
 io.on('connection', (socket) => {
   streamUpdated();
   io.emit('update mics', { mics });
-  console.log('mics', mics);
   io.emit('update webcams', { webcams });
 
   socket.on('title changed', title => {
@@ -189,6 +191,8 @@ app.post('/api/init-stream', async (req, res) => {
     'Authorization': 'Bearer ' + oauthToken,
   }
 
+  log('Starting stream');
+
   let data = await fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn', {
     method: 'POST',
     headers: headers,
@@ -206,6 +210,7 @@ app.post('/api/init-stream', async (req, res) => {
   data = await data.json();
 
   if (data.error) {
+    log(data.error);
     return res.send({ success: false, error: data.error });
   }
 
@@ -236,6 +241,7 @@ app.post('/api/init-stream', async (req, res) => {
   data = await data.json();
 
   if (data.error) {
+    log(data.error);
     return res.send({ success: false, error: data.error });
   }
 
@@ -260,17 +266,18 @@ app.post('/api/init-stream', async (req, res) => {
 
   const localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
-  const cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid];[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset veryfast ${localVideoFilename} -map [vid2] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
-  //const cmd = `ffmpeg -y -f dshow -video_size ${webcam1.resolution} -framerate ${webcam1.framerate} -i video="${webcam1.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 1984k -bufsize 3968k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+  const cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid];[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset veryfast ${localVideoFilename} -map [vid2] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 3000k -bufsize 6000k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+  //const cmd = `ffmpeg -y -f dshow -video_size ${webcam1.resolution} -framerate ${webcam1.framerate} -i video="${webcam1.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 3000k -bufsize 6000k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
 
-  execp(cmd).then(({err, stdout, stderr}) => {
-    console.log('ffmpeg command run');
+  execp(cmd).then(({ err, stdout, stderr }) => {
+    log('ffmpeg command run', true);
 
     if (err) {
-      console.error(err);
+      log(err, true);
     }
 
-    console.log(stdout, stderr);
+    log(stdout, true);
+    log(stderr, true);
   });
   
   stream.isStreaming = true;
@@ -290,7 +297,7 @@ app.post('/api/stop-streaming', async (req, res) => {
     return res.send({
       success: false,
       error: 'not_streaming'
-    })
+    });
   }
 
   let { oauthToken } = req.body;
@@ -299,38 +306,70 @@ app.post('/api/stop-streaming', async (req, res) => {
     return res.send({
       success: false,
       error: 'no_oauth_token'
-    })
+    });
   }
 
-  // tell google that stream has stopped
-  let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id=${stream.youtubeId}&broadcastStatus=complete&part=id`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + oauthToken
-    }
-  });
-  data = await data.json();
+  let streamDesiredLength = Date.now() - stream.startTime;
 
   await updateTitleAndDescription(stream.title, oauthToken);
 
-  console.log(data);
-
-  execp('taskkill /im ffmpeg.exe /t /f').then(({error, stdout, stderr}) => {
-    if (err) {
-      console.error(err);
-    }
-
-    console.log('stopped ffmpeg');
-    console.log(stdout, stderr);
-  });
-
-  clearStream();
   res.send({
     success: true
   });
 
   streamUpdated();
+
+
+  // check to see how long the stream has been going on for
+  let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet&id=${stream.youtubeId}`,
+  {
+    heades: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + oauthToken
+    }
+  });
+  data = await data.json();
+  let actualStartTime = (new Date(data.items[0].snippet.actualStartTime)).getTime();
+
+  stop();
+
+  async function stop() {
+    if (Date.now() - actualStartTime < streamDesiredLength) {
+      printYellow('DO NOT close the terminal yet. Still uploading your video.');
+      printYellow('Only uploaded ' + 100 * ((Date.now() - actualStartTime) / streamDesiredLength) + '% of video');
+      return setTimeout(stop, 2000);
+    }
+
+    log('Stopping stream');
+
+    // tell google that stream has stopped
+    let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id=${stream.youtubeId}&broadcastStatus=complete&part=id`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + oauthToken
+      }
+    });
+    data = await data.json();
+
+    if (data.error)
+      log(data.error);
+
+    execp('taskkill /im ffmpeg.exe /t /f').then(({ error, stdout, stderr }) => {
+      if (err) {
+        log(err, true);
+      }
+
+      log('stopped ffmpeg', true);
+      log(stdout);
+      log(stderr);
+    });
+
+    clearStream();
+
+    printYellow('It is OK to close the terminal now. Your video has been completely uploaded!');
+  }
+  
 });
 
 app.get('/api/ip', (req, res) => {
@@ -349,5 +388,5 @@ const fileWatcher = new FileCleaner(localVideoDirName, 24*3600000, '* */15 * * *
 let port;
 let listener = http.listen(process.env.PORT || 1266, () => {
   port = listener.address().port;
-  console.log('Server listening on port', port);
+  log('Server listening on port', port);
 });
