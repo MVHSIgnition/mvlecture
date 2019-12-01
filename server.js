@@ -60,15 +60,52 @@ parseDevices().then(({ webcams: w, mics: m }) => {
   mics = m;
   io.emit('update mics', { mics });
   io.emit('update webcams', { webcams });
+
+  //TEST DATA
+  /*
+  webcams.push({name: 'A cool webcam', resolution: '100x100', framerate: '30'});
+  webcams.push({name: 'A cooler webcam', resolution: '100x100', framerate: '30'});
+  mics.push('woahahah mic');
+  mics.push('better mic');
+  */
+
+  readConfig();
 });
 
 function streamUpdated() {
   io.emit('update state', { stream });  
 }
 
+function readConfig() {
+  if (fs.existsSync('config.json')) {
+    fs.readFile('config.json', (err, data) => {
+      if (err) throw err;
+      const selected = JSON.parse(data);
+
+      if (webcams && mics) {
+        const webcamIndex = webcams.findIndex((w) => w.name === selected.webcam.name);
+        const micIndex = mics.indexOf(selected.mic);
+        if (webcamIndex != -1) stream.uiState.webcam = webcamIndex;
+        if (micIndex != -1) stream.uiState.mic = micIndex;
+        streamUpdated();
+      }
+    });
+  }
+}
+
+function writeConfig() {
+  fs.writeFile('config.json', 
+    JSON.stringify({webcam: webcams[stream.uiState.webcam], mic: mics[stream.uiState.mic]}), 
+    (err) => {
+      if (err) throw err;
+    }
+  );
+}
+
 // socket.io
 io.on('connection', (socket) => {
   streamUpdated();
+  readConfig();
   io.emit('update mics', { mics });
   io.emit('update webcams', { webcams });
 
@@ -89,11 +126,13 @@ io.on('connection', (socket) => {
 
   socket.on('webcam select changed', index => {
     stream.uiState.webcam = index;
+    writeConfig();
     streamUpdated();
   });
 
   socket.on('mic select changed', index => {
     stream.uiState.mic = index;
+    writeConfig();
     streamUpdated();
   });
 

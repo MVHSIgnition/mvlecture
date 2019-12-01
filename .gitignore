@@ -2,3 +2,4 @@ node_modules
 .DS_Store
 videos/*.mkv
 logs.txt
+config.json
