@@ -27,6 +27,9 @@ if (!fs.existsSync(localVideoDirName)) {
   fs.mkdirSync(localVideoDirName);
 }
 
+
+let shouldStreamToYoutube = true;
+
 let stream = null;
 clearStream();
 
@@ -82,21 +85,27 @@ function readConfig() {
       if (err) throw err;
       const selected = JSON.parse(data);
 
+      shouldStreamToYoutube = (typeof selected.shouldStreamToYoutube === 'boolean') ? selected.shouldStreamToYoutube : true;
+
       if (webcams && mics) {
         const webcamIndex = webcams.findIndex((w) => w.name === selected.webcam.name);
         const micIndex = mics.indexOf(selected.mic);
-        if (webcamIndex != -1) stream.uiState.webcam = webcamIndex;
-        if (micIndex != -1) stream.uiState.mic = micIndex;
-        streamUpdated();
+        if (webcamIndex !== -1) stream.uiState.webcam = webcamIndex;
+        if (micIndex !== -1) stream.uiState.mic = micIndex;
       }
+      streamUpdated();
     });
   }
 }
 
 function writeConfig() {
   fs.writeFile('config.json', 
-    JSON.stringify({webcam: webcams[stream.uiState.webcam], mic: mics[stream.uiState.mic]}), 
-    (err) => {
+    JSON.stringify({
+      webcam: webcams[stream.uiState.webcam]
+      mic: mics[stream.uiState.mic],
+      shouldStreamToYoutube
+    }), 
+    err => {
       if (err) throw err;
     }
   );
@@ -144,7 +153,7 @@ io.on('connection', (socket) => {
 
 // bookmarks api
 app.post('/api/set-bookmarks', async (req, res) => {
-  if (!stream.isStreaming) {
+  if (!stream.isStreaming || !shouldStreamToYoutube) {
     return res.send({
       success: false,
       error: 'not_streaming'
@@ -172,7 +181,7 @@ app.post('/api/set-bookmarks', async (req, res) => {
 
 app.post('/api/update-stream', async (req, res) => {
 
-  if (!stream.isStreaming) {
+  if (!stream.isStreaming || !shouldStreamToYoutube) {
     return res.send({
       success: false,
       error: 'not_streaming'
@@ -224,89 +233,93 @@ app.post('/api/init-stream', async (req, res) => {
 
   stream.title = title;
 
-  // create livestream rtmpAddr 
-  const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer ' + oauthToken,
-  }
-
   log('Starting stream', true);
 
-  let data = await fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn', {
-    method: 'POST',
-    headers: headers,
-    body: JSON.stringify({
-      snippet: {
-        title
-      },
-      cdn: {
-        resolution: 'variable',
-        frameRate: 'variable',
-        ingestionType: 'rtmp'
-      }
-    })
-  });
-  data = await data.json();
+  if (shouldStreamToYoutube) {
 
-  if (data.error) {
-    log(data.error);
-    return res.send({ success: false, error: data.error });
+    // create livestream rtmpAddr 
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + oauthToken,
+    }
+
+    let data = await fetch('https://www.googleapis.com/youtube/v3/liveStreams?part=snippet,cdn', {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify({
+        snippet: {
+          title
+        },
+        cdn: {
+          resolution: 'variable',
+          frameRate: 'variable',
+          ingestionType: 'rtmp'
+        }
+      })
+    });
+    data = await data.json();
+
+    if (data.error) {
+      log(data.error);
+      return res.send({ success: false, error: data.error });
+    }
+
+    // set backend state with google-provided streaming values
+    stream.streamId = data.id;
+    stream.rtmpAddr = data.cdn.ingestionInfo.ingestionAddress + '/' + data.cdn.ingestionInfo.streamName;
+
+
+    // create livestream on youtube channel
+    stream.scheduledStartTime = new Date().toISOString();
+    data = await fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        snippet: {
+          scheduledStartTime: stream.scheduledStartTime,
+          title
+        },
+        status: {
+          privacyStatus: 'public'
+        },
+        contentDetails: {
+          recordFromStart: true,
+          enableAutoStart: true
+        }
+      }),
+    });
+    data = await data.json();
+
+    if (data.error) {
+      log(data.error);
+      return res.send({ success: false, error: data.error });
+    }
+
+    stream.youtubeId = data.id;
+
+    // bind the youtube livestream with rtmpAddr
+    data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id=${stream.youtubeId}&part=id&streamId=${stream.streamId}`, {
+      method: 'POST',
+      headers
+    });
+    data = await data.json();
+    stream.startTime = Date.now();
+
+    // add to playlist
+    if (playlistId)
+      await addVideoToPlaylist(stream.youtubeId, playlistId, oauthToken);
+
   }
-
-  // set backend state with google-provided streaming values
-  stream.streamId = data.id;
-  stream.rtmpAddr = data.cdn.ingestionInfo.ingestionAddress + '/' + data.cdn.ingestionInfo.streamName;
-
-
-  // create livestream on youtube channel
-  stream.scheduledStartTime = new Date().toISOString();
-  data = await fetch('https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet,status,contentDetails', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      snippet: {
-        scheduledStartTime: stream.scheduledStartTime,
-        title
-      },
-      status: {
-        privacyStatus: 'public'
-      },
-      contentDetails: {
-        recordFromStart: true,
-        enableAutoStart: true
-      }
-    }),
-  });
-  data = await data.json();
-
-  if (data.error) {
-    log(data.error);
-    return res.send({ success: false, error: data.error });
-  }
-
-  stream.youtubeId = data.id;
-
-  // bind the youtube livestream with rtmpAddr
-  data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/bind?id=${stream.youtubeId}&part=id&streamId=${stream.streamId}`, {
-    method: 'POST',
-    headers
-  });
-  data = await data.json();
-  stream.startTime = Date.now();
-
-  // add to playlist
-  if (playlistId)
-    await addVideoToPlaylist(stream.youtubeId, playlistId, oauthToken);
-
 
   // spin-up ffmpeg to begin feeding video and audio the rtmp url
   const webcam = webcams[stream.uiState.webcam];
   const micName = mics[stream.uiState.mic];
-
   const localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
-  const cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid];[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset veryfast ${localVideoFilename} -map [vid2] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 3000k -bufsize 6000k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
-  //const cmd = `ffmpeg -y -f dshow -video_size ${webcam1.resolution} -framerate ${webcam1.framerate} -i video="${webcam1.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 3000k -bufsize 6000k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+  let cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid];[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset veryfast ${localVideoFilename}`;
+
+  if (shouldStreamToYoutube)
+    cmd += ` -map [vid2] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 3000k -bufsize 6000k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
 
   execp(cmd).then(({ err, stdout, stderr }) => {
     log('ffmpeg started up', true);
@@ -325,7 +338,7 @@ app.post('/api/init-stream', async (req, res) => {
   });
 
   // update initial description
-  await updateTitleAndDescription(stream, stream.title, oauthToken);
+  if (shouldStreamToYoutube) await updateTitleAndDescription(stream, stream.title, oauthToken);
 
   streamUpdated();
 });
@@ -348,6 +361,13 @@ app.post('/api/stop-streaming', async (req, res) => {
     });
   }
 
+  if (!shouldStreamToYoutube) {
+    execp('taskkill /im ffmpeg.exe /t /f');
+    return res.send({
+      success: true
+    });
+  }
+
   let streamDesiredLength = Date.now() - stream.startTime;
 
   await updateTitleAndDescription(stream, stream.title, oauthToken);
@@ -357,7 +377,6 @@ app.post('/api/stop-streaming', async (req, res) => {
   });
 
   streamUpdated();
-
 
   // check to see how long the stream has been going on for
   let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet&id=${stream.youtubeId}`,
