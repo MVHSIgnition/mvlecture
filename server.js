@@ -101,7 +101,7 @@ function readConfig() {
 function writeConfig() {
   fs.writeFile('config.json', 
     JSON.stringify({
-      webcam: webcams[stream.uiState.webcam]
+      webcam: webcams[stream.uiState.webcam],
       mic: mics[stream.uiState.mic],
       shouldStreamToYoutube
     }), 
