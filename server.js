@@ -61,7 +61,6 @@ let webcams, mics;
 parseDevices().then(({ webcams: w, mics: m }) => {
   webcams = w;
   mics = m;
-  console.log(w, m);
   io.emit('update mics', { mics });
   io.emit('update webcams', { webcams });
 
