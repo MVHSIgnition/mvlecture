@@ -78,7 +78,7 @@ parseDevices().then(({ webcams: w, mics: m }) => {
 function streamUpdated() {
   io.emit('update state', { stream });  
 }
-asdfasdf
+
 function readConfig() {
   if (fs.existsSync('config.json')) {
     fs.readFile('config.json', (err, data) => {
