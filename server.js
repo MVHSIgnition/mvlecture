@@ -61,6 +61,7 @@ let webcams, mics;
 parseDevices().then(({ webcams: w, mics: m }) => {
   webcams = w;
   mics = m;
+  console.log(w, m);
   io.emit('update mics', { mics });
   io.emit('update webcams', { webcams });
 
@@ -362,6 +363,7 @@ app.post('/api/stop-streaming', async (req, res) => {
   }
 
   if (!shouldStreamToYoutube) {
+	console.log('bruh u stupid');
     execp('taskkill /im ffmpeg.exe /t /f');
     return res.send({
       success: true
