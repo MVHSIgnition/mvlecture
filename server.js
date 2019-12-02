@@ -393,9 +393,10 @@ app.post('/api/stop-streaming', async (req, res) => {
 
   async function stop() {
     if (Date.now() - actualStartTime < streamDesiredLength) {
+      let note = 'DO NOT close the terminal yet. Still uploading your video.\nOnly uploaded ' + 100 * ((Date.now() - actualStartTime) / streamDesiredLength) + '% of video'
+      log(note)
       console.log('\n');
-      printYellow('DO NOT close the terminal yet. Still uploading your video.');
-      printYellow('Only uploaded ' + 100 * ((Date.now() - actualStartTime) / streamDesiredLength) + '% of video');
+      printYellow(note);
       return setTimeout(stop, 2000);
     }
 
