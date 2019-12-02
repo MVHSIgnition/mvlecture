@@ -1,1 +1,1 @@
-npm install && npm start & start "" http://localhost:1266
+npm install && start "" http://localhost:1266 && npm start
