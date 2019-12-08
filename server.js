@@ -27,8 +27,10 @@ if (!fs.existsSync(localVideoDirName)) {
   fs.mkdirSync(localVideoDirName);
 }
 
-
-let shouldStreamToYoutube = true;
+let settings = {
+  shouldStreamToYoutube: true,
+  youtubeCompression: true
+}
 
 let stream = null;
 clearStream();
@@ -85,7 +87,8 @@ function readConfig() {
       if (err) throw err;
       const selected = JSON.parse(data);
 
-      shouldStreamToYoutube = (typeof selected.shouldStreamToYoutube === 'boolean') ? selected.shouldStreamToYoutube : true;
+      settings.shouldStreamToYoutube = (typeof selected.shouldStreamToYoutube === 'boolean') ? selected.shouldStreamToYoutube : true;
+      settings.youtubeCompression = (typeof selected.youtubeCompression === 'boolean') ? selected.youtubeCompression : true;
 
       if (webcams && mics) {
         const webcamIndex = webcams.findIndex((w) => w.name === selected.webcam.name);
@@ -103,7 +106,7 @@ function writeConfig() {
     JSON.stringify({
       webcam: webcams[stream.uiState.webcam],
       mic: mics[stream.uiState.mic],
-      shouldStreamToYoutube
+      ...settings
     }), 
     err => {
       if (err) throw err;
@@ -153,7 +156,7 @@ io.on('connection', (socket) => {
 
 // bookmarks api
 app.post('/api/set-bookmarks', async (req, res) => {
-  if (!stream.isStreaming || !shouldStreamToYoutube) {
+  if (!stream.isStreaming || !settings.shouldStreamToYoutube) {
     return res.send({
       success: false,
       error: 'not_streaming'
@@ -181,7 +184,7 @@ app.post('/api/set-bookmarks', async (req, res) => {
 
 app.post('/api/update-stream', async (req, res) => {
 
-  if (!stream.isStreaming || !shouldStreamToYoutube) {
+  if (!stream.isStreaming || !settings.shouldStreamToYoutube) {
     return res.send({
       success: false,
       error: 'not_streaming'
@@ -235,7 +238,7 @@ app.post('/api/init-stream', async (req, res) => {
 
   log('Starting stream', true);
 
-  if (shouldStreamToYoutube) {
+  if (settings.shouldStreamToYoutube) {
 
     // create livestream rtmpAddr 
     const headers = {
@@ -317,22 +320,24 @@ app.post('/api/init-stream', async (req, res) => {
   const localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
   // const localVideoFilename = title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
-  let cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex `;
+  let cmd = `ffmpeg -y -f dshow -rtbufsize 50M -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex `;
 
-  if (shouldStreamToYoutube) {
-    cmd += `"[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid];[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset veryfast ${localVideoFilename} -map [vid2] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 5000k -bufsize 6000k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+  let filter = '[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]';
+
+  if (settings.shouldStreamToYoutube) {
+    cmd += `"${filter};[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset veryfast ${localVideoFilename} -map [vid2] -map 0:a -copyts -c:v libx264 -preset veryfast ${settings.youtubeCompression ? '-maxrate 3000k -bufsize 6000k' : ''} -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
   } else {
-    cmd += `"[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -preset veryfast ${localVideoFilename}`;
+    cmd += `"${filter}" -map [vid] -map 0:a -preset veryfast ${localVideoFilename}`;
   }
 
-
+  log('Starting up ffmpeg', true);
   execp(cmd).then(({ err, stdout, stderr }) => {
-    log('ffmpeg started up', true);
-
     if (err) {
       log(err);
     }
 
+    // only gets here when ffmpeg stops spitting out stuff (aka when it stops)
+    log('ffmpeg has stopped');
     log(stdout);
     log(stderr);
   });
@@ -343,7 +348,7 @@ app.post('/api/init-stream', async (req, res) => {
   });
 
   // update initial description
-  if (shouldStreamToYoutube) await updateTitleAndDescription(stream, stream.title, oauthToken);
+  if (settings.shouldStreamToYoutube) await updateTitleAndDescription(stream, stream.title, oauthToken);
 
   streamUpdated();
 });
@@ -366,7 +371,7 @@ app.post('/api/stop-streaming', async (req, res) => {
     });
   }
 
-  if (!shouldStreamToYoutube) {
+  if (!settings.shouldStreamToYoutube) {
     execp('taskkill /im ffmpeg.exe /t /f');
     return res.send({
       success: true
