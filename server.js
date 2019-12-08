@@ -315,11 +315,16 @@ app.post('/api/init-stream', async (req, res) => {
   const webcam = webcams[stream.uiState.webcam];
   const micName = mics[stream.uiState.mic];
   const localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
+  // const localVideoFilename = title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
-  let cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid];[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset veryfast ${localVideoFilename}`;
+  let cmd = `ffmpeg -y -f dshow -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex `;
 
-  if (shouldStreamToYoutube)
-    cmd += ` -map [vid2] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 3000k -bufsize 6000k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+  if (shouldStreamToYoutube) {
+    cmd += `"[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid];[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset veryfast ${localVideoFilename} -map [vid2] -map 0:a -copyts -c:v libx264 -preset veryfast -maxrate 5000k -bufsize 6000k -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+  } else {
+    cmd += `"[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]" -map [vid] -map 0:a -preset veryfast ${localVideoFilename}`;
+  }
+
 
   execp(cmd).then(({ err, stdout, stderr }) => {
     log('ffmpeg started up', true);
@@ -362,7 +367,6 @@ app.post('/api/stop-streaming', async (req, res) => {
   }
 
   if (!shouldStreamToYoutube) {
-	console.log('bruh u stupid');
     execp('taskkill /im ffmpeg.exe /t /f');
     return res.send({
       success: true
