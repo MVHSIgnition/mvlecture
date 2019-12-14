@@ -320,14 +320,17 @@ app.post('/api/init-stream', async (req, res) => {
   const localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
   // const localVideoFilename = title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
-  let cmd = `ffmpeg -y -f dshow -rtbufsize 50M -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex `;
+  let cmd = `ffmpeg -y -f dshow -rtbufsize 1024M -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex `;
 
-  let filter = '[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]';
+  const filter = '[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]';
+  const compressionQuality = 'veryfast';
 
+
+  // https://support.google.com/youtube/answer/2853702?hl=en - youtube recommends 3M to 6M
   if (settings.shouldStreamToYoutube) {
-    cmd += `"${filter};[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset veryfast ${localVideoFilename} -map [vid2] -map 0:a -copyts -c:v libx264 -preset veryfast ${settings.youtubeCompression ? '-maxrate 3000k -bufsize 6000k' : ''} -g 60 -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+    cmd += `"${filter};[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset ${compressionQuality} ${localVideoFilename} -map [vid2] -map 0:a -copyts -c:v libx264 -preset ${compressionQuality} ${settings.youtubeCompression ? '-maxrate 6000k -bufsize 6000k' : ''} -g ${webcam.framerate * 2} -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
   } else {
-    cmd += `"${filter}" -map [vid] -map 0:a -preset veryfast ${localVideoFilename}`;
+    cmd += `"${filter}" -map [vid] -map 0:a -preset ${compressionQuality} ${localVideoFilename}`;
   }
 
   log('Starting up ffmpeg', true);
