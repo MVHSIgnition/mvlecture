@@ -323,7 +323,7 @@ app.post('/api/init-stream', async (req, res) => {
   let cmd = `ffmpeg -y -f dshow -rtbufsize 1024M -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex `;
 
   const filter = '[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]';
-  const compressionQuality = 'veryfast';
+  const compressionQuality = 'fast';
 
   // https://support.google.com/youtube/answer/2853702?hl=en - youtube recommends 3M to 6M
   if (settings.shouldStreamToYoutube) {
