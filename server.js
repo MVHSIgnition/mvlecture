@@ -14,7 +14,7 @@ const {
 } = require('./lib/helpers.js');
 const parseDevices = require('./lib/parseDevices.js');
 
-const FileCleaner = require('cron-file-cleaner').FileCleaner;
+// const FileCleaner = require('cron-file-cleaner').FileCleaner;
 const io = require('socket.io')(http);
 
 app.use(express.json());
@@ -325,12 +325,11 @@ app.post('/api/init-stream', async (req, res) => {
   const filter = '[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]';
   const compressionQuality = 'veryfast';
 
-
   // https://support.google.com/youtube/answer/2853702?hl=en - youtube recommends 3M to 6M
   if (settings.shouldStreamToYoutube) {
-    cmd += `"${filter};[vid]split=2[vid1][vid2]" -map [vid1] -map 0:a -preset ${compressionQuality} ${localVideoFilename} -map [vid2] -map 0:a -copyts -c:v libx264 -preset ${compressionQuality} ${settings.youtubeCompression ? '-maxrate 6000k -bufsize 6000k' : ''} -g ${webcam.framerate * 2} -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+    cmd += `"${filter}" -map [vid] -map 0:a -copyts -c:v libx264 -preset ${compressionQuality} ${settings.youtubeCompression ? '-maxrate 6000k -bufsize 6000k' : ''} -g ${webcam.framerate * 2} -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
   } else {
-    cmd += `"${filter}" -map [vid] -map 0:a -preset ${compressionQuality} ${localVideoFilename}`;
+    cmd += `"${filter}" -map [vid] -map 0:a -preset ${compressionQuality} "${localVideoFilename}"`;
   }
 
   log('Starting up ffmpeg', true);
@@ -453,10 +452,10 @@ app.get('/api/ip', (req, res) => {
 });
 
 // Delete all files older than 24 hours
-const fileWatcher = new FileCleaner(localVideoDirName, 24*3600000, '* */15 * * * *', {
-  start: true,
+//const fileWatcher = new FileCleaner(localVideoDirName, 24*3600000, '* */15 * * * *', {
+  /*start: true,
   blacklist: '/\.init/'
-});
+});*/
 
 let port;
 let listener = http.listen(process.env.PORT || 1266, () => {
