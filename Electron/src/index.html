@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Sign In</title>
+  </head>
+  <body>
+    <div class="lds-ring"><div></div><div></div><div></div><div></div></div>
+    <script>
+      const {ipcRenderer} = require('electron');
+      ipcRenderer.send('signin');
+    </script>
+  </body>
+</html>
