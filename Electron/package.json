@@ -3,7 +3,7 @@
   "productName": "app",
   "version": "1.0.0",
   "description": "My Electron application description",
-  "main": "src/index.js",
+  "main": "src/main.js",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",
@@ -48,8 +48,11 @@
     "axios": "^0.19.0",
     "crypto": "^1.0.1",
     "electron-squirrel-startup": "^1.0.0",
+    "electron-store": "^5.1.0",
     "express": "^4.17.1",
-    "google-auth-library": "^5.7.0"
+    "fluent-ffmpeg": "^2.1.2",
+    "google-auth-library": "^5.7.0",
+    "keytar": "^5.0.0"
   },
   "devDependencies": {
     "@electron-forge/cli": "^6.0.0-beta.45",
