@@ -20,7 +20,7 @@ const io = require('socket.io')(http);
 app.use(express.json());
 app.use(express.static(__dirname + '/static/'))
 
-const localVideoDirName = __dirname + '/videos/';
+const localVideoDirName = __dirname + '\\videos\\';
 
 // Create video folder if it doesn't exist
 if (!fs.existsSync(localVideoDirName)) {
