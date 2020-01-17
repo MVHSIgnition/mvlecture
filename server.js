@@ -380,8 +380,6 @@ app.post('/api/stop-streaming', async (req, res) => {
     });
   }
 
-  let streamDesiredLength = Date.now() - stream.startTime;
-
   await updateTitleAndDescription(stream, stream.title, oauthToken);
 
   res.send({
@@ -390,58 +388,34 @@ app.post('/api/stop-streaming', async (req, res) => {
 
   streamUpdated();
 
-  // check to see how long the stream has been going on for
-  let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts?part=snippet&id=${stream.youtubeId}`,
-  {
+  log('Stopping stream', true);
+
+  // tell google that stream has stopped
+  let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id=${stream.youtubeId}&broadcastStatus=complete&part=id`, {
+    method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer ' + oauthToken
     }
   });
   data = await data.json();
-  let actualStartTime = (new Date(data.items[0].snippet.actualStartTime)).getTime();
 
-  stop();
+  if (data.error)
+    log(data.error);
 
-  async function stop() {
-    if (Date.now() - actualStartTime < streamDesiredLength) {
-      let note = 'DO NOT close the terminal yet. Still uploading your video.\nOnly uploaded ' + 100 * ((Date.now() - actualStartTime) / streamDesiredLength) + '% of video'
-      log(note)
-      console.log('\n');
-      printYellow(note);
-      return setTimeout(stop, 2000);
+  log('Stopping ffmpeg', true);
+  execp('taskkill /im ffmpeg.exe /t /f').then(({ err, stdout, stderr }) => {
+    if (err) {
+      log(err);
     }
 
-    log('Stopping stream', true);
+    log(stdout);
+    log(stderr);
+  });
 
-    // tell google that stream has stopped
-    let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id=${stream.youtubeId}&broadcastStatus=complete&part=id`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + oauthToken
-      }
-    });
-    data = await data.json();
+  clearStream();
 
-    if (data.error)
-      log(data.error);
-
-    log('Stopping ffmpeg', true);
-    execp('taskkill /im ffmpeg.exe /t /f').then(({ err, stdout, stderr }) => {
-      if (err) {
-        log(err);
-      }
-
-      log(stdout);
-      log(stderr);
-    });
-
-    clearStream();
-
-    printYellow('It is OK to close the terminal now. Your video has been completely uploaded!');
-  }
-  
+  printYellow('It is OK to close the terminal now. Your video has been completely uploaded!');
 });
 
 app.get('/api/ip', (req, res) => {
