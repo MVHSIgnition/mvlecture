@@ -63,11 +63,11 @@ function createBookmark() {
     }
 }
 
-function checkValidToken() {
+async function checkValidToken() {
     // Validate token, print error if not valid
     if (!params.error) {
         thereIsAnError(null);
-        fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' + params.access_token)
+        return fetch('https://www.googleapis.com/oauth2/v1/tokeninfo?access_token=' + params.access_token)
         .then(res => res.json())
         .then(data => {
             if (data.error) {
@@ -111,8 +111,8 @@ function setStreaming(isStreaming) {
     }
 }
 
-function startEndStream() {
-    checkValidToken();
+async function startEndStream() {
+    await checkValidToken();
     document.getElementById('startBtn').disabled = true;
 
     if (!isStreaming) {
