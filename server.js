@@ -390,15 +390,20 @@ app.post('/api/stop-streaming', async (req, res) => {
 
   log('Stopping stream', true);
 
-  // tell google that stream has stopped
-  let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id=${stream.youtubeId}&broadcastStatus=complete&part=id`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + oauthToken
-    }
-  });
-  data = await data.json();
+  try {
+    // tell google that stream has stopped
+    let data = await fetch(`https://www.googleapis.com/youtube/v3/liveBroadcasts/transition?id=${stream.youtubeId}&broadcastStatus=complete&part=id`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + oauthToken
+      }
+    });
+    data = await data.json();
+  } catch (e) {
+    log(JSON.stringify(e));
+  }
+    
 
   if (data.error)
     log(data.error);
