@@ -1,2 +1,4 @@
 #!/bin/bash
-git pull && npm install && open "http://localhost:1266" && npm start
+cd /Users/marti_mcguirk/Applications/mvlecture/
+git pull
+npm install && open "http://localhost:1266" && npm start

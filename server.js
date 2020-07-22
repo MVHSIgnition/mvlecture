@@ -320,7 +320,7 @@ app.post('/api/init-stream', async (req, res) => {
   const localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
   // const localVideoFilename = title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
-  let cmd = `ffmpeg -y -f dshow -rtbufsize 1024M -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex `;
+  let cmd = `./ffmpeg -y -f dshow -rtbufsize 1024M -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex `;
 
   const filter = '[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]';
   const compressionQuality = 'fast';
@@ -374,7 +374,7 @@ app.post('/api/stop-streaming', async (req, res) => {
   }
 
   if (!settings.shouldStreamToYoutube) {
-    execp('taskkill /im ffmpeg.exe /t /f');
+    execp('killall ffmpeg');
     return res.send({
       success: true
     });
@@ -410,7 +410,7 @@ app.post('/api/stop-streaming', async (req, res) => {
     log(data.error);
 
   log('Stopping ffmpeg', true);
-  execp('taskkill /im ffmpeg.exe /t /f').then(({ err, stdout, stderr }) => {
+  execp('killall ffmpeg').then(({ err, stdout, stderr }) => {
     if (err) {
       log(err);
     }
