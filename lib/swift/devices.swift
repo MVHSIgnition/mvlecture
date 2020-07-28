@@ -2,7 +2,9 @@ import Foundation
 import AVFoundation
 // use swiftc to compile or run in shell script way
 
-/* if #available(macOS 10.15, *) {
+/* 
+// wants us to use this for newer macs
+if #available(macOS 10.15, *) {
   let sess = AVCaptureDevice.DiscoverySession(AVCaptureDevice.DeviceType.builtInMicrophone)
 
 } */
@@ -59,6 +61,6 @@ for device in audioDevices {
 }
 let jsonData = try JSONSerialization.data(withJSONObject: micNames)
 if let str = String(data: jsonData, encoding: String.Encoding.utf8) {
-  print(str)
+  print(str, terminator:"") // prints last line with \n
 }
 
