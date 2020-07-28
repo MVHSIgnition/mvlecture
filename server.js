@@ -12,7 +12,7 @@ const {
   log,
   printYellow
 } = require('./lib/helpers.js');
-const parseDevices = require('./lib/parseDevices.js');
+const parseDevices = require('./lib/parseDevicesMacOS.js');
 
 // const FileCleaner = require('cron-file-cleaner').FileCleaner;
 const io = require('socket.io')(http);
@@ -78,7 +78,7 @@ parseDevices().then(({ webcams: w, mics: m }) => {
 });
 
 function streamUpdated() {
-  io.emit('update state', { stream });  
+  io.emit('update state', { stream });
 }
 
 function readConfig() {
@@ -102,12 +102,12 @@ function readConfig() {
 }
 
 function writeConfig() {
-  fs.writeFile('config.json', 
+  fs.writeFile('config.json',
     JSON.stringify({
       webcam: webcams[stream.uiState.webcam],
       mic: mics[stream.uiState.mic],
       ...settings
-    }), 
+    }),
     err => {
       if (err) throw err;
     }
@@ -343,7 +343,7 @@ app.post('/api/init-stream', async (req, res) => {
     log(stdout);
     log(stderr);
   });
-  
+
   stream.isStreaming = true;
   res.send({
     success: true
@@ -404,7 +404,7 @@ app.post('/api/stop-streaming', async (req, res) => {
   } catch (e) {
     log(JSON.stringify(e));
   }
-    
+
 
   if (data.error)
     log(data.error);
@@ -433,8 +433,8 @@ app.get('/api/ip', (req, res) => {
 
 // Delete all files older than 24 hours
 //const fileWatcher = new FileCleaner(localVideoDirName, 24*3600000, '* */15 * * * *', {
-  /*start: true,
-  blacklist: '/\.init/'
+/*start: true,
+blacklist: '/\.init/'
 });*/
 
 let port;
