@@ -42,9 +42,11 @@ for device in videoDevices {
     let data: [String: Any] = [
       "type": "webcam",
       "name": device.localizedName,
-      "width": bestRes.width,
-      "height": bestRes.height,
-      "framerate": bestFps
+      "framerate": bestFps,
+      "res": [
+        "width": bestRes.width,
+        "height": bestRes.height
+      ]
     ]
 
     let jsonData = try JSONSerialization.data(withJSONObject: data)
@@ -63,4 +65,3 @@ let jsonData = try JSONSerialization.data(withJSONObject: micNames)
 if let str = String(data: jsonData, encoding: String.Encoding.utf8) {
   print(str, terminator:"") // prints last line with \n
 }
-
