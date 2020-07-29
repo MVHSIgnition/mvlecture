@@ -336,11 +336,12 @@ app.post('/api/init-stream', async (req, res) => {
   // ------------- END WINDOWS CODE -------------
   let vidMic = stream.uiState.webcam + ':' + stream.uiState.mic;
   // let cmd = `./ffmpeg -f avfoundation -framerate ${webcam.framerate} -video_size ${webcam.resolution} -i "${vidMic}" -i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a -preset ${compressionQuality} -vcodec libx264 -tune zerolatency -c:a aac -b:a 128k -ar 44100 -f flv "rtmp://a.rtmp.youtube.com/live2/wk46-aju9-g0jr-5au4-ekpj"`
-  let cmd = `./ffmpeg -f avfoundation -framerate ${webcam.framerate} -video_size ${webcam.resolution} -i "${vidMic}" -preset ultrafast -vcodec libx264 -preset ${compressionQuality} -tune zerolatency -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+  let cmd = `./ffmpeg -f avfoundation -framerate ${webcam.framerate} -video_size ${webcam.resolution} -i "${vidMic}" -i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a -preset ultrafast -vcodec libx264 -preset ${compressionQuality} -tune zerolatency -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+  
   console.log(cmd);
 
   log('Starting up ffmpeg', true);
-  /* execp(cmd).then(({ err, stdout, stderr }) => {
+  execp(cmd).then(({ err, stdout, stderr }) => {
     if (err) {
       log(err);
     }
@@ -349,7 +350,7 @@ app.post('/api/init-stream', async (req, res) => {
     log('ffmpeg has stopped');
     log(stdout);
     log(stderr);
-  }); */
+  });
 
   stream.isStreaming = true;
   res.send({
