@@ -337,7 +337,7 @@ app.post('/api/init-stream', async (req, res) => {
 
   // ------------- BEGIN MACOS CODE -------------
   let vidMic = stream.uiState.webcam + ':' + stream.uiState.mic;
-  let cmd = `./ffmpeg -f avfoundation -framerate ${webcam.framerate} -video_size ${webcam.resolution} -i "${vidMic}" -i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a -preset ultrafast -vcodec libx264 -preset ${compressionQuality} -tune zerolatency -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+  let cmd = `./ffmpeg -f avfoundation -framerate ${webcam.framerate} -video_size ${webcam.resolution} -i "${vidMic}" -i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a -vcodec libx264 -preset ${compressionQuality} -tune zerolatency -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
   // ------------- END MACOS CODE -------------
 
   log('Starting up ffmpeg', true);
