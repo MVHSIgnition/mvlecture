@@ -4,7 +4,6 @@ const http = require('http').createServer(app);
 const fetch = require('node-fetch');
 const fs = require('fs');
 const {
-  generateDescription,
   getLanIpAddress,
   updateTitleAndDescription,
   addVideoToPlaylist,
@@ -334,11 +333,12 @@ app.post('/api/init-stream', async (req, res) => {
     cmd += `"${filter}" -map [vid] -map 0:a -preset ${compressionQuality} "${localVideoFilename}"`;
   } */
   // ------------- END WINDOWS CODE -------------
+
+
+  // ------------- BEGIN MACOS CODE -------------
   let vidMic = stream.uiState.webcam + ':' + stream.uiState.mic;
-  // let cmd = `./ffmpeg -f avfoundation -framerate ${webcam.framerate} -video_size ${webcam.resolution} -i "${vidMic}" -i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a -preset ${compressionQuality} -vcodec libx264 -tune zerolatency -c:a aac -b:a 128k -ar 44100 -f flv "rtmp://a.rtmp.youtube.com/live2/wk46-aju9-g0jr-5au4-ekpj"`
   let cmd = `./ffmpeg -f avfoundation -framerate ${webcam.framerate} -video_size ${webcam.resolution} -i "${vidMic}" -i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a -preset ultrafast -vcodec libx264 -preset ${compressionQuality} -tune zerolatency -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
-  
-  console.log(cmd);
+  // ------------- END MACOS CODE -------------
 
   log('Starting up ffmpeg', true);
   execp(cmd).then(({ err, stdout, stderr }) => {
