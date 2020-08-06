@@ -4,6 +4,7 @@ const http = require('http').createServer(app);
 const fetch = require('node-fetch');
 const fs = require('fs');
 const {
+  generateDescription,
   getLanIpAddress,
   updateTitleAndDescription,
   addVideoToPlaylist,
@@ -11,7 +12,7 @@ const {
   log,
   printYellow
 } = require('./lib/helpers.js');
-const parseDevices = require('./lib/parseDevicesMacOS.js');
+const parseDevices = require('./lib/parseDevices.js');
 
 // const FileCleaner = require('cron-file-cleaner').FileCleaner;
 const io = require('socket.io')(http);
@@ -77,7 +78,7 @@ parseDevices().then(({ webcams: w, mics: m }) => {
 });
 
 function streamUpdated() {
-  io.emit('update state', { stream });
+  io.emit('update state', { stream });  
 }
 
 function readConfig() {
@@ -101,12 +102,12 @@ function readConfig() {
 }
 
 function writeConfig() {
-  fs.writeFile('config.json',
+  fs.writeFile('config.json', 
     JSON.stringify({
       webcam: webcams[stream.uiState.webcam],
       mic: mics[stream.uiState.mic],
       ...settings
-    }),
+    }), 
     err => {
       if (err) throw err;
     }
@@ -319,29 +320,17 @@ app.post('/api/init-stream', async (req, res) => {
   const localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
   // const localVideoFilename = title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
+  let cmd = `ffmpeg -y -f dshow -rtbufsize 1024M -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex `;
 
   const filter = '[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]';
-  const compressionQuality = 'ultrafast';
-
-  // ------------- BEGIN WINDOWS CODE -------------
-  /* let cmd = `./ffmpeg -y -f dshow -rtbufsize 1024M -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex `;
+  const compressionQuality = 'fast';
 
   // https://support.google.com/youtube/answer/2853702?hl=en - youtube recommends 3M to 6M
   if (settings.shouldStreamToYoutube) {
     cmd += `"${filter}" -map [vid] -map 0:a -copyts -c:v libx264 -preset ${compressionQuality} ${settings.youtubeCompression ? '-maxrate 6000k -bufsize 6000k' : ''} -g ${webcam.framerate * 2} -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
   } else {
     cmd += `"${filter}" -map [vid] -map 0:a -preset ${compressionQuality} "${localVideoFilename}"`;
-  } */
-  // ------------- END WINDOWS CODE -------------
-
-
-  // ------------- BEGIN MACOS CODE -------------
-  let vidMic = stream.uiState.webcam + ':' + stream.uiState.mic;
-  // let cmd = `./ffmpeg -f avfoundation -framerate ${webcam.framerate} -video_size ${webcam.resolution} -i "${vidMic}" -i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a -vcodec libx264 -g ${webcam.framerate * 2} -preset ${compressionQuality} -c:a mp3 -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
-  let cmd = `./ffmpeg -f avfoundation -framerate ${webcam.framerate} -video_size ${webcam.resolution} -i "${vidMic}" -i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a -f flv "${stream.rtmpAddr}"`;
-  // ------------- END MACOS CODE -------------
-
-  // console.log(cmd);
+  }
 
   log('Starting up ffmpeg', true);
   execp(cmd).then(({ err, stdout, stderr }) => {
@@ -354,7 +343,7 @@ app.post('/api/init-stream', async (req, res) => {
     log(stdout);
     log(stderr);
   });
-
+  
   stream.isStreaming = true;
   res.send({
     success: true
@@ -385,7 +374,7 @@ app.post('/api/stop-streaming', async (req, res) => {
   }
 
   if (!settings.shouldStreamToYoutube) {
-    execp('killall ffmpeg');
+    execp('taskkill /im ffmpeg.exe /t /f');
     return res.send({
       success: true
     });
@@ -415,13 +404,13 @@ app.post('/api/stop-streaming', async (req, res) => {
   } catch (e) {
     log(JSON.stringify(e));
   }
-
+    
 
   if (data.error)
     log(data.error);
 
   log('Stopping ffmpeg', true);
-  execp('killall ffmpeg').then(({ err, stdout, stderr }) => {
+  execp('taskkill /im ffmpeg.exe /t /f').then(({ err, stdout, stderr }) => {
     if (err) {
       log(err);
     }
@@ -444,8 +433,8 @@ app.get('/api/ip', (req, res) => {
 
 // Delete all files older than 24 hours
 //const fileWatcher = new FileCleaner(localVideoDirName, 24*3600000, '* */15 * * * *', {
-/*start: true,
-blacklist: '/\.init/'
+  /*start: true,
+  blacklist: '/\.init/'
 });*/
 
 let port;
