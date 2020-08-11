@@ -337,7 +337,7 @@ app.post('/api/init-stream', async (req, res) => {
   // const localVideoFilename = title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
   const filter = '[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]';
-  const compressionQuality = 'ultrafast';
+  const compressionQuality = 'fast';
   let cmd;
 
   if (platform === 'win32') {
@@ -378,6 +378,7 @@ app.post('/api/init-stream', async (req, res) => {
 });
 
 app.post('/api/stop-streaming', async (req, res) => {
+  let killCmd = platform === 'darwin' ? 'killall ffmpeg' : 'taskkill /im ffmpeg.exe /t /f';
 
   if (!stream.isStreaming) {
     return res.send({
@@ -396,7 +397,7 @@ app.post('/api/stop-streaming', async (req, res) => {
   }
 
   if (!settings.shouldStreamToYoutube) {
-    execp('killall ffmpeg');
+    execp(killCmd);
     return res.send({
       success: true
     });
@@ -432,7 +433,7 @@ app.post('/api/stop-streaming', async (req, res) => {
     log(data.error);
 
   log('Stopping ffmpeg', true);
-  execp('killall ffmpeg').then(({ err, stdout, stderr }) => {
+  execp(killCmd).then(({ err, stdout, stderr }) => {
     if (err) {
       log(err);
     }
