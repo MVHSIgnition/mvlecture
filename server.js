@@ -338,10 +338,11 @@ app.post('/api/init-stream', async (req, res) => {
 
   const filter = '[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]';
   const compressionQuality = 'fast';
+  const filterCode = settings.flipVideo ? `-i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a` : '';
   let cmd;
 
   if (platform === 'win32') {
-    cmd = `./ffmpeg -y -f dshow -rtbufsize 1024M -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a -preset ${compressionQuality} `;
+    cmd = `./ffmpeg -y -f dshow -rtbufsize 1024M -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" ${filterCode} -preset ${compressionQuality} `;
 
     // https://support.google.com/youtube/answer/2853702?hl=en - youtube recommends 3M to 6M
     if (settings.shouldStreamToYoutube) {
@@ -351,7 +352,7 @@ app.post('/api/init-stream', async (req, res) => {
     }
   } else if (platform === 'darwin') {
     let vidMic = stream.uiState.webcam + ':' + stream.uiState.mic;
-    cmd = `./ffmpeg -f avfoundation -framerate ${webcam.framerate} -video_size ${webcam.resolution} -i "${vidMic}" -i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a -vcodec libx264 -g ${webcam.framerate * 2} -preset ${compressionQuality} -c:a mp3 -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+    cmd = `./ffmpeg -f avfoundation -framerate ${webcam.framerate} -video_size ${webcam.resolution} -i "${vidMic}" ${filterCode} -vcodec libx264 -g ${webcam.framerate * 2} -preset ${compressionQuality} -c:a mp3 -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
   }
 
   log('Starting up ffmpeg', true);
