@@ -1,3 +1,4 @@
+const os = require('os');
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
@@ -11,7 +12,21 @@ const {
   log,
   printYellow
 } = require('./lib/helpers.js');
-const parseDevices = require('./lib/parseDevicesMacOS.js');
+
+const platform = os.platform();
+let parseDevices;
+
+switch (platform) {
+  case 'darwin':
+    parseDevices = require('./lib/parseDevicesMacOS.js');
+    break;
+  case 'win32':
+    parseDevices = require('./lib/parseDevicesWindows.js');
+    break;
+  default:
+    console.error('This application only works on Mac and Windows');
+    process.exit(1);
+}
 
 // const FileCleaner = require('cron-file-cleaner').FileCleaner;
 const io = require('socket.io')(http);
@@ -28,7 +43,8 @@ if (!fs.existsSync(localVideoDirName)) {
 
 let settings = {
   shouldStreamToYoutube: true,
-  youtubeCompression: true
+  youtubeCompression: true,
+  flipVideo: true
 }
 
 let stream = null;
@@ -88,6 +104,7 @@ function readConfig() {
 
       settings.shouldStreamToYoutube = (typeof selected.shouldStreamToYoutube === 'boolean') ? selected.shouldStreamToYoutube : true;
       settings.youtubeCompression = (typeof selected.youtubeCompression === 'boolean') ? selected.youtubeCompression : true;
+      settings.flipVideo = (typeof selected.flipVideo === 'boolean') ? selected.flipVideo : true;
 
       if (webcams && mics) {
         const webcamIndex = webcams.findIndex((w) => w.name === selected.webcam.name);
@@ -319,29 +336,23 @@ app.post('/api/init-stream', async (req, res) => {
   const localVideoFilename = localVideoDirName + title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
   // const localVideoFilename = title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.mkv';
 
-
   const filter = '[0:v]transpose=2,transpose=2[v0_upsidedown];[v0_upsidedown][1:v]overlay=W-w:H-h[vid]';
   const compressionQuality = 'ultrafast';
+  let cmd;
 
-  // ------------- BEGIN WINDOWS CODE -------------
-  /* let cmd = `./ffmpeg -y -f dshow -rtbufsize 1024M -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex `;
+  if (platform === 'win32') {
+    cmd = `./ffmpeg -y -f dshow -rtbufsize 1024M -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" -i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a -preset ${compressionQuality} `;
 
-  // https://support.google.com/youtube/answer/2853702?hl=en - youtube recommends 3M to 6M
-  if (settings.shouldStreamToYoutube) {
-    cmd += `"${filter}" -map [vid] -map 0:a -copyts -c:v libx264 -preset ${compressionQuality} ${settings.youtubeCompression ? '-maxrate 6000k -bufsize 6000k' : ''} -g ${webcam.framerate * 2} -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
-  } else {
-    cmd += `"${filter}" -map [vid] -map 0:a -preset ${compressionQuality} "${localVideoFilename}"`;
-  } */
-  // ------------- END WINDOWS CODE -------------
-
-
-  // ------------- BEGIN MACOS CODE -------------
-  let vidMic = stream.uiState.webcam + ':' + stream.uiState.mic;
-  // let cmd = `./ffmpeg -f avfoundation -framerate ${webcam.framerate} -video_size ${webcam.resolution} -i "${vidMic}" -i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a -vcodec libx264 -g ${webcam.framerate * 2} -preset ${compressionQuality} -c:a mp3 -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
-  let cmd = `./ffmpeg -f avfoundation -framerate ${webcam.framerate} -video_size ${webcam.resolution} -i "${vidMic}" -i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a -f flv "${stream.rtmpAddr}"`;
-  // ------------- END MACOS CODE -------------
-
-  // console.log(cmd);
+    // https://support.google.com/youtube/answer/2853702?hl=en - youtube recommends 3M to 6M
+    if (settings.shouldStreamToYoutube) {
+      cmd += `-copyts -c:v libx264 ${settings.youtubeCompression ? '-maxrate 6000k -bufsize 6000k' : ''} -g ${webcam.framerate * 2} -c:a aac -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+    } else {
+      cmd += `"${localVideoFilename}"`;
+    }
+  } else if (platform === 'darwin') {
+    let vidMic = stream.uiState.webcam + ':' + stream.uiState.mic;
+    cmd = `./ffmpeg -f avfoundation -framerate ${webcam.framerate} -video_size ${webcam.resolution} -i "${vidMic}" -i ./img/ignition_small.png -filter_complex "${filter}" -map [vid] -map 0:a -vcodec libx264 -g ${webcam.framerate * 2} -preset ${compressionQuality} -c:a mp3 -b:a 128k -ar 44100 -f flv "${stream.rtmpAddr}"`;
+  }
 
   log('Starting up ffmpeg', true);
   execp(cmd).then(({ err, stdout, stderr }) => {
