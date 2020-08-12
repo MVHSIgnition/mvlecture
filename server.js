@@ -342,7 +342,7 @@ app.post('/api/init-stream', async (req, res) => {
   let cmd;
 
   if (platform === 'win32') {
-    cmd = `./ffmpeg -y -f dshow -rtbufsize 1024M -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" ${filterCode} -preset ${compressionQuality} `;
+    cmd = `ffmpeg -y -f dshow -rtbufsize 1024M -video_size ${webcam.resolution} -framerate ${webcam.framerate} -i video="${webcam.name}":audio="${micName}" ${filterCode} -preset ${compressionQuality} `;
 
     // https://support.google.com/youtube/answer/2853702?hl=en - youtube recommends 3M to 6M
     if (settings.shouldStreamToYoutube) {
