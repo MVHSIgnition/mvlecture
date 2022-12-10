@@ -20,7 +20,7 @@
   "dependencies": {
     "body-parser": "^1.18.3",
     "cron-file-cleaner": "^1.1.0",
-    "express": "^4.17.1",
+    "express": "^4.17.3",
     "ffmpeg.js": "^3.1.9001",
     "fluent-ffmpeg": "^2.1.2",
     "node-fetch": "^2.6.0",
